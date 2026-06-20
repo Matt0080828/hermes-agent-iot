@@ -65,7 +65,7 @@ memory:
 cd llama.cpp && ./server -m qwen2.5-7b-instruct-q4_k_m.gguf -c 2048 --port 8080
 
 # Terminal 2: Run hermes-agent
-cd new_agent && hermes
+cd hermes-agent-iot && hermes
 ```
 
 ## Memory

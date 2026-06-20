@@ -61,7 +61,7 @@ pip install --upgrade pip
 
 ```bash
 git clone https://github.com/matttest0080-prog/hermes-agent-iot.git
-cd new_agent
+cd hermes-agent-iot
 pip install -e .
 ```
 
@@ -174,7 +174,7 @@ EOF
 source ~/.hermes-venv/bin/activate
 
 # Change to Hermes directory
-cd ~/new_agent
+cd ~/hermes-agent-iot
 
 # Start Hermes
 hermes
@@ -231,7 +231,7 @@ huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct-GGUF \
 
 ## Repository
 
-- **GitHub**: https://github.com/Matt0080828/new_agent
+- **GitHub**: https://github.com/matttest0080-prog/hermes-agent-iot
 - **Tags**: `v0.9-pi2` (latest) |
 
 ## Notes
