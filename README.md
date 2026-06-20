@@ -60,7 +60,7 @@ pip install --upgrade pip
 ### Step 3: Install Hermes Agent
 
 ```bash
-git clone https://github.com/Matt0080828/new_agent.git
+git clone https://github.com/matttest0080-prog/hermes-agent-iot.git
 cd new_agent
 pip install -e .
 ```
