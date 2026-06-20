@@ -34,7 +34,7 @@ wget https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7
 # Install hermes-agent
 git clone https://github.com/matttest0080-prog/hermes-agent-iot.git
 cd hermes-agent-iot
-pip install -e .
+./setup-hermes.sh
 
 # Configure
 hermes setup

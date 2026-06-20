@@ -62,7 +62,7 @@ pip install --upgrade pip
 ```bash
 git clone https://github.com/matttest0080-prog/hermes-agent-iot.git
 cd hermes-agent-iot
-pip install -e .
+./setup-hermes.sh
 ```
 
 ### Step 4: Install RAG Dependencies (Pi2 Optimized)
