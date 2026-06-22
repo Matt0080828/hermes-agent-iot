@@ -228,11 +228,20 @@ huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct-GGUF \
 | `v0.7-pi2` | Replace chromadb with honcho-ai for RAG |
 | `v0.8-pi2` | Add explicit httpx install in setup script |
 | `v0.9-pi2` | Add Nous Research origin attribution |
+| `v10.0-pi2` | Add SYNC_STRATEGY.md for hermes-agent 0.17.0 sync process |
 
 ## Repository
 
 - **GitHub**: https://github.com/matttest0080-prog/hermes-agent-iot
-- **Tags**: `v0.9-pi2` (latest) |
+- **Tags**: `v10.0-pi2` (latest) |
+
+## Sync Strategy
+
+This repository is maintained as a **minimal CLI version** for Raspberry Pi 2 (ARMv7 32-bit, 1GB RAM).
+
+For updates from the main Hermes Agent repository:
+- See [`SYNC_STRATEGY.md`](./SYNC_STRATEGY.md) for the full merge process
+- Latest sync target: `hermes-agent 0.17.0`
 
 ## Notes
 
