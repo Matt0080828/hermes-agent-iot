@@ -57,24 +57,46 @@ source ~/.hermes-venv/bin/activate
 pip install --upgrade pip
 ```
 
-### Step 3: Install Hermes Agent
+### Step 3: Install Hermes Agent (Pi2 Optimized)
+
+**Option A: Auto-setup (Recommended)**
 
 ```bash
 git clone https://github.com/Matt0080828/hermes-agent-iot.git
 cd hermes-agent-iot
-bash setup-hermes.sh
+bash setup-pi2-minimal.sh
+```
+
+**Option B: Manual setup**
+
+```bash
+git clone https://github.com/Matt0080828/hermes-agent-iot.git
+cd hermes-agent-iot
+python3 -m venv ~/.hermes-venv
+source ~/.hermes-venv/bin/activate
+pip install --upgrade pip
+pip install openai==2.24.0 certifi python-dotenv fire "httpx[socks]" rich tenacity pyyaml ruamel.yaml requests jinja2 pydantic prompt_toolkit croniter packaging Markdown "PyJWT[crypto]" "urllib3>=2.7.0,<3" psutil websockets pathspec ptyprocess
 ```
 
 ### Step 4: Install RAG Dependencies (Pi2 Optimized)
 
-**Note**: For Raspberry Pi 2 (1GB RAM), `setup-hermes.sh` automatically detects Pi2 and installs minimal CLI bundle.
-Skip this step unless you need to manually install RAG dependencies.
+**Note**: For Raspberry Pi 2 (1GB RAM), RAG now uses **honcho-ai** (cloud-based memory) instead of local chromadb/sentence-transformers to save RAM.
 
 ```bash
-# Already included in setup-hermes.sh for Pi2: httpx, rich, tenacity, pyyaml, etc.
-# For RAG features, manually install:
-pip install honcho-ai chromadb sentence-transformers pypdf beautifulsoup4
+# Install honcho-ai RAG (cloud memory)
+pip install honcho-ai pypdf beautifulsoup4
+
+# Configure in .env:
+# HONCHO_API_KEY=your_api_key_here
+# Get free API key: https://honcho.dev
 ```
+
+**Optional tools**:
+- `pip install anthropic` — Anthropic Claude API
+- `pip install mcp starlette` — MCP tools
+- `pip install 'python-telegram-bot[webhooks]'` — Telegram Bot
+- `pip install slack-bolt slack-sdk aiohttp` — Slack Bot
+- `pip install fastapi 'uvicorn[standard]'` — Web API (FastAPI)
 
 ### Step 5: Configure Hermes
 
@@ -274,16 +296,17 @@ huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct-GGUF \
 | `v0.4-pi2` | Minimal CLI only (35MB) |
 | `v0.5-pi2` | RAG SQLite backend + uvloop fix |
 | `v0.6-pi2` | Remove uvloop/fastapi, use asyncio |
-| `v0.7-pi2` | Replace chromadb with honcho-ai for RAG |
+| `v0.7-pi2` | Replace chromadb with honcho-ai for RAG (cloud memory) |
 | `v0.8-pi2` | Add explicit httpx install in setup script |
 | `v0.9-pi2` | Add Nous Research origin attribution |
 | `v10.0-pi2` | Add SYNC_STRATEGY.md for hermes-agent 0.17.0 sync process |
 | `v11.0-pi2` | Remove Docker deps, add setup-pi2.sh, Pi2 minimal config |
+| `v11.1-pi2` | Update to honcho-ai RAG, fix browser import errors |
 
 ## Repository
 
 - **GitHub**: https://github.com/Matt0080828/hermes-agent-iot
-- **Tags**: `v11.0-pi2` (latest) |
+- **Tags**: `v11.1-pi2` (latest)
 
 ## Sync Strategy
 
