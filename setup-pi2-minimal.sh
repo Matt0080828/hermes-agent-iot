@@ -88,13 +88,10 @@ fi
 
 # ---- 建立 hermes 指令捷徑 ----
 LINK_TARGET="$HOME/.local/bin/hermes"
-mkdir -p "$HOME/.local/bin"
+install -d "$HOME/.local/bin"
 if [ -f "$REPO_DIR/cli.py" ]; then
-  cat > "$LINK_TARGET" <<EOF
-#!/bin/bash
-source "$VENV_DIR/bin/activate"
-python "$REPO_DIR/cli.py" "\$@"
-EOF
+  printf '#!/bin/bash\nsource "%s/bin/activate"\npython "%s/cli.py" "$@"\n' \
+    "$VENV_DIR" "$REPO_DIR" > "$LINK_TARGET"
   chmod +x "$LINK_TARGET"
   echo "==> 'hermes' 指令已安裝到 $LINK_TARGET"
 else
