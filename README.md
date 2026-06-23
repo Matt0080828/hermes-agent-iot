@@ -57,22 +57,22 @@ source ~/.hermes-venv/bin/activate
 pip install --upgrade pip
 ```
 
-### Step 3: Install Hermes Agent (Pi2 Minimal)
+### Step 3: Install Hermes Agent
 
 ```bash
 git clone https://github.com/Matt0080828/hermes-agent-iot.git
 cd hermes-agent-iot
-bash setup-pi2.sh
+bash setup-hermes.sh
 ```
 
 ### Step 4: Install RAG Dependencies (Pi2 Optimized)
 
-**Note**: For Raspberry Pi 2 (1GB RAM), RAG dependencies are already installed in `setup-pi2.sh`.
-Skip this step unless you need to manually install.
+**Note**: For Raspberry Pi 2 (1GB RAM), `setup-hermes.sh` automatically detects Pi2 and installs minimal CLI bundle.
+Skip this step unless you need to manually install RAG dependencies.
 
 ```bash
-# Already included in setup-pi2.sh: honcho, chromadb, sentence-transformers, pypdf, beautifulsoup4
-# If manual install needed:
+# Already included in setup-hermes.sh for Pi2: httpx, rich, tenacity, pyyaml, etc.
+# For RAG features, manually install:
 pip install honcho-ai chromadb sentence-transformers pypdf beautifulsoup4
 ```
 
