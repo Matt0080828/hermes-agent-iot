@@ -6,9 +6,10 @@
 ## Table of Contents
 1. [Hardware and System Requirements](#hardware-and-system-requirements)
 2. [Installation Steps](#installation-steps)
-3. [Using lm-studio (Recommended)](#using-lm-studio-recommended)
-4. [Using llama.cpp (Advanced)](#using-llamacpp-advanced)
-5. [FAQ](#faq)
+3. [Multi-Pi2 Shared Memory / RAG](#multi-pi2-shared-memory--rag)
+4. [Using lm-studio (Recommended)](#using-lm-studio-recommended)
+5. [Using llama.cpp (Advanced)](#using-llamacpp-advanced)
+6. [FAQ](#faq)
 
 ---
 
@@ -16,11 +17,13 @@
 
 | Item | Specification |
 |------|---------------|
-| Device | Raspberry Pi 2 Model B |
-| CPU | ARMv7 900MHz (4 cores) |
-| RAM | 1GB LPDDR2 |
+| Device | Raspberry Pi 2 Model B or newer / equivalent Linux SBC |
+| CPU | ARMv7 900MHz (4 cores) minimum |
+| RAM | 1GB LPDDR2 minimum |
 | Storage | microSD card (at least 8GB) |
-| OS | Raspberry Pi OS Lite (32-bit) |
+| OS | Raspberry Pi OS Lite (32-bit) or compatible Linux |
+
+**Note:** Raspberry Pi 2 is the minimum target used to keep the default profile conservative. Newer Raspberry Pi boards, Pi Zero 2 W, ARM64 SBCs, x86 mini PCs, and VMs can use the same install path; higher-spec systems may enable heavier Hermes features after setup.
 
 **Note:** Raspberry Pi 2 uses a 32-bit ARM architecture and does not support 64-bit software.
 
@@ -46,8 +49,49 @@ pip install --upgrade pip
 ### 3. Install Hermes Agent dependencies
 
 ```bash
-pip install honcho-ai sentence-transformers pypdf beautifulsoup4
+pip install honcho-ai pypdf beautifulsoup4
 ```
+
+Do not install `torch`, `sentence-transformers`, or `chromadb` on Raspberry Pi 2 by default. Pi2 is ARMv7 with 1GB RAM; those packages are large, often require source builds, and are too slow/heavy for local semantic RAG. Use Hermes built-in memory/session search locally, and use remote embeddings, cloud memory, or a vector database on another machine when semantic RAG is needed.
+
+---
+
+## Multi-Pi2 Shared Memory / RAG
+
+When several Pi2 nodes need the same long-term memory or RAG corpus, keep the Pi2 devices light and centralize the heavy work. Each Pi2 should run Hermes Agent and call a shared LAN/cloud memory service over HTTP.
+
+```text
+Pi2 kitchen ┐
+Pi2 lab     ├── HTTP/LAN API ──> shared memory/RAG server
+Pi2 garage  ┘                    ├── SQLite/Postgres memory store
+                                  ├── remote embedding API or LAN embedding model
+                                  └── Qdrant/Chroma/pgvector vector index
+```
+
+Recommended responsibilities:
+
+- Pi2 nodes: Hermes CLI, local short-term/session cache, API calls to add/search memory, no local embedding model.
+- Shared server: embeddings, vector index, keyword index, backups, deduplication, and conflict handling.
+- Storage: start with SQLite FTS5 or Postgres for shared keyword memory; add Qdrant/pgvector only when semantic search is required.
+
+Store scope metadata with each item so one Pi2 does not accidentally pollute another Pi2's context:
+
+```json
+{
+  "device_id": "pi2-kitchen",
+  "scope": "global|device|room|user",
+  "source": "conversation|note|sensor|manual",
+  "created_at": "2026-06-25T00:00:00Z"
+}
+```
+
+Avoid these patterns on Pi2:
+
+- installing `torch`, `sentence-transformers`, and `chromadb` on every node
+- syncing raw Chroma/vector DB directories between nodes
+- letting multiple Pi2 devices write directly to one SQLite database over NFS/Samba
+
+Use an API boundary instead: the server serializes writes and Pi2 nodes remain replaceable clients.
 
 ---
 
@@ -114,6 +158,8 @@ cd ~/llama.cpp
 **Parameter notes:**
 - `-c 2048`: context size (limited by Raspberry Pi 2 RAM)
 - `--n_gpu_layers 0`: do not use GPU (Raspberry Pi 2 has no CUDA)
+
+Hermes' upstream local/Ollama tool-use guard defaults to a 64K runtime-context floor. The Pi2 templates tune that down with `agent.minimum_tool_context_length` (`2048` for core, `8192` for native/rag) so constrained local models can run in a degraded low-tool mode. Use a stronger LAN/cloud model with 64K+ context for full Hermes tool use and shared RAG.
 
 #### 4. Test the API
 
@@ -271,8 +317,10 @@ make -j2 LLAMA_AVX2=OFF LLAMA_AVX=OFF  # Use only 2 cores
 **Solution:**
 ```bash
 source ~/.hermes-venv/bin/activate
-pip install honcho-ai sentence-transformers pypdf beautifulsoup4
+pip install honcho-ai pypdf beautifulsoup4
 ```
+
+Do not fix this by installing `sentence-transformers`, `torch`, or `chromadb` locally on Pi2. Prefer remote embeddings/cloud memory or another machine for vector search.
 
 ### Q4: How do I configure memory limits?
 
@@ -386,9 +434,11 @@ echo "Step 4: Installing hermes-agent..."
 cd ~/hermes-agent-iot
 pip install -e .
 
-# Step 5: Install RAG dependencies
-echo "Step 5: Installing RAG dependencies..."
-pip install honcho-ai sentence-transformers pypdf beautifulsoup4
+# Step 5: Install lightweight memory/document helpers only
+echo "Step 5: Installing lightweight memory/document helpers..."
+pip install honcho-ai pypdf beautifulsoup4
+echo "Skipping local torch, sentence-transformers, and chromadb on Pi2."
+echo "Use remote embeddings/cloud memory or a vector DB on another machine for semantic RAG."
 
 # Step 6: Setup config
 echo "Step 6: Creating config..."

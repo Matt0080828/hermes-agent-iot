@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 # ============================================================
 # setup-pi2-minimal.sh
-# Native-compatible Raspberry Pi 2 / ARMv7 install profile.
+# Native-compatible Raspberry Pi 2 / ARMv7 baseline install profile.
+# Also safe for newer Raspberry Pi boards, ARM64 SBCs, x86 mini PCs, and VMs.
 #
 # This script preserves Hermes Agent's upstream Python package path
 # (pip install -e .) and only changes the default install profile/config.
 # It does NOT patch or delete source files.
 #
 # Usage:
-#   bash setup-pi2-minimal.sh [--profile core|native|rag] [--venv ~/.hermes-venv]
+#   bash setup-pi2-minimal.sh [--profile minimal|iot|rag|full|dev] [--venv ~/.hermes-venv]
 #
 # Profiles:
-#   core   : smallest practical Hermes CLI install; heavy tools disabled by config
-#   native : core + MCP/ACP/Home Assistant/SMS extras, still no browser/voice/media
-#   rag    : native + lightweight document/RAG helpers; remote embeddings recommended
+#   minimal: smallest practical Hermes CLI install; heavy tools disabled by config
+#   iot    : minimal + MCP/ACP/Home Assistant/MQTT/SMS extras
+#   rag    : iot + lightweight document/RAG helpers; remote embeddings recommended
+#   full   : broader cross-platform Hermes extras for stronger edge hosts
+#   dev    : full + developer/test tooling
 # ============================================================
 
 set -euo pipefail
@@ -26,12 +29,13 @@ HERMES_HOME_DIR="${HERMES_HOME:-$HOME/.hermes}"
 
 usage() {
   cat <<'EOF'
-Usage: bash setup-pi2-minimal.sh [--profile core|native|rag] [--venv PATH]
+Usage: bash setup-pi2-minimal.sh [--profile minimal|iot|rag|full|dev] [--venv PATH]
 
 Examples:
   bash setup-pi2-minimal.sh
-  bash setup-pi2-minimal.sh --profile native
+  bash setup-pi2-minimal.sh --profile iot
   bash setup-pi2-minimal.sh --profile rag --venv ~/.hermes-venv
+  bash setup-pi2-minimal.sh --profile full    # stronger Pi/ARM64/x86 host only
 EOF
 }
 
@@ -58,9 +62,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$PROFILE" in
-  core|native|rag) ;;
+  core) PROFILE="minimal" ;;
+  native) PROFILE="iot" ;;
+  minimal|iot|rag|full|dev) ;;
   *)
-    echo "Invalid profile: $PROFILE (expected core, native, or rag)" >&2
+    echo "Invalid profile: $PROFILE (expected minimal, iot, rag, full, or dev)" >&2
     exit 2
     ;;
 esac
@@ -93,14 +99,20 @@ source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip setuptools wheel
 
 case "$PROFILE" in
-  core)
+  minimal)
     EXTRAS="cli,pty"
     ;;
-  native)
-    EXTRAS="cli,pty,mcp,acp,homeassistant,sms"
+  iot)
+    EXTRAS="cli,pty,mcp,acp,homeassistant,mqtt,sms"
     ;;
   rag)
-    EXTRAS="cli,pty,mcp,acp,homeassistant,sms,honcho"
+    EXTRAS="cli,pty,mcp,acp,homeassistant,mqtt,sms,honcho"
+    ;;
+  full)
+    EXTRAS="all"
+    ;;
+  dev)
+    EXTRAS="all,dev"
     ;;
 esac
 
@@ -110,13 +122,31 @@ python -m pip install -e "$REPO_DIR[$EXTRAS]"
 if [[ "$PROFILE" == "rag" ]]; then
   echo "==> [Pi2] Installing lightweight RAG document helpers"
   python -m pip install pypdf beautifulsoup4
-  # sqlite-vec may not have wheels for every ARMv7 Python build. Treat it as
-  # opportunistic: FTS5/built-in memory still works without it.
-  python -m pip install sqlite-vec || echo "==> [Pi2] sqlite-vec not available for this platform; continuing without local vector index"
+  # sqlite-vec does not publish wheels for Raspberry Pi 2 / ARMv7 Python builds
+  # on PyPI/piwheels. Treat it as opportunistic and avoid printing a scary pip
+  # ERROR on platforms where we already know it is unavailable. FTS5/built-in
+  # memory and remote embeddings still work without a local vector extension.
+  MACHINE="$(python - <<'PY'
+import platform
+print(platform.machine().lower())
+PY
+)"
+  if [[ "${HERMES_PI2_TRY_SQLITE_VEC:-0}" == "1" ]]; then
+    python -m pip install sqlite-vec || echo "==> [Pi2] sqlite-vec install failed; continuing without local vector index"
+  elif [[ "$MACHINE" == armv7l || "$MACHINE" == armv6l ]]; then
+    echo "==> [Pi2] sqlite-vec wheels are unavailable for $MACHINE; using FTS5/remote embeddings instead"
+    echo "    To try a source/manual install anyway: HERMES_PI2_TRY_SQLITE_VEC=1 bash setup-pi2-minimal.sh --profile rag"
+  else
+    python -m pip install sqlite-vec || echo "==> [Pi2] sqlite-vec not available for this platform; continuing without local vector index"
+  fi
 fi
 
 install -d "$HERMES_HOME_DIR"
-TEMPLATE="$REPO_DIR/templates/config.pi2-$PROFILE.yaml"
+case "$PROFILE" in
+  minimal) TEMPLATE="$REPO_DIR/templates/config.pi2-core.yaml" ;;
+  iot|full|dev) TEMPLATE="$REPO_DIR/templates/config.pi2-native.yaml" ;;
+  rag) TEMPLATE="$REPO_DIR/templates/config.pi2-rag.yaml" ;;
+esac
 if [[ ! -f "$TEMPLATE" ]]; then
   TEMPLATE="$REPO_DIR/templates/config.pi2-core.yaml"
 fi
@@ -153,5 +183,6 @@ echo ""
 echo "Optional next steps:"
 echo "  - Configure model/provider: hermes setup model"
 echo "  - Re-enable disabled tools later: hermes tools"
+echo "  - WhatsApp/Baileys bridge and Photon sidecar stay opt-in; review npm audit before enabling"
 echo "  - For local llama.cpp/OpenAI-compatible endpoint, set model.provider/custom config via hermes setup"
 echo "  - Active hermes command resolved as: $HERMES_CMD"
