@@ -231,7 +231,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # for stripped/source-build installs that somehow dropped it. The vision
     # call site uses prompt=False so it can never raise a blocking input()
     # prompt mid-session (#40490).
-    "tool.vision": ("Pillow==12.2.0",),
+    "tool.vision": ("Pillow==12.3.0",),
     # MQTT IoT tools — small pure-Python client, lazy-installed so Pi2 core
     # installs do not pull it unless MQTT is actually used.
     "tool.mqtt": ("paho-mqtt==2.1.0",),
