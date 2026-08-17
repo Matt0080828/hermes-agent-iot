@@ -800,6 +800,7 @@ from hermes_cli.model_setup_flows import (
     _model_flow_qwen_oauth,
     _model_flow_minimax_oauth,
     _model_flow_custom,
+    _model_flow_local_llama,
     _model_flow_azure_foundry,
     _model_flow_named_custom,
     _model_flow_copilot,
@@ -3822,6 +3823,7 @@ def select_provider_and_model(args=None):
             ordered.append((key, label, []))
 
     ordered.append(("custom", "Custom endpoint (enter URL manually)", []))
+    ordered.append(("local-llama", "Local AI (llama.cpp / llama-server)", []))
     _has_saved_custom_list = isinstance(config.get("custom_providers"), list) and bool(
         config.get("custom_providers")
     )
@@ -3891,6 +3893,8 @@ def select_provider_and_model(args=None):
         _model_flow_copilot(config, current_model)
     elif selected_provider == "custom":
         _model_flow_custom(config)
+    elif selected_provider == "local-llama":
+        _model_flow_local_llama(config)
     elif (
         selected_provider.startswith("custom:")
         or selected_provider in _custom_provider_map
@@ -12018,7 +12022,7 @@ def cmd_monitoring(args):
         else:
             print("  OTLP endpoint:  not configured (monitoring.export.otlp)")
         print(f"  OTel SDK:       {'installed' if otlp_exporter.is_available() else 'not installed'} "
-              f"(optional extra: hermes-agent[otlp])")
+              f"(optional extra: hermes-agent-iot[otlp])")
         print("\n  Scope: gateway service health + redacted diagnostics only.")
         print("  No prompts, messages, tool args/results, usage analytics, or traces.")
         return
