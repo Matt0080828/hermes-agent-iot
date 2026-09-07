@@ -23,6 +23,10 @@ Hermes Agent IoT is an IoT/robotics-focused fork of [NousResearch/hermes-agent](
 - **Robotics direction:** foundation for GPIO, I2C, PWM, sensors, actuators, and robotics skills.
 - **Upstream-aware:** IoT and ARMv7 compatibility changes are reviewed separately from fast-moving upstream development.
 
+## Demo
+
+[Hermes Agent on Raspberry Pi 2 — I2C / PCA9685](https://www.youtube.com/watch?v=oRI_HE1xO08)
+
 ## Quick Start — Raspberry Pi 2
 
 Hermes Agent IoT requires Python `>=3.11,<3.14`. Install it in a virtual environment:
