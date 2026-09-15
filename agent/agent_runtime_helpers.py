@@ -2138,9 +2138,13 @@ def _build_primary_runtime_snapshot(agent, api_mode) -> Dict[str, Any]:
     }
     if api_mode == "anthropic_messages":
         rt.update({
-            "anthropic_api_key": agent._anthropic_api_key,
-            "anthropic_base_url": agent._anthropic_base_url,
-            "is_anthropic_oauth": agent._is_anthropic_oauth,
+            # A bare or freshly switched agent may never have had the native Anthropic
+            # client installed, and tests build agents via SimpleNamespace/__new__ without
+            # those attributes. Record the slots defensively so the snapshot (and the
+            # matching restore) never raises on a partial agent.
+            "anthropic_api_key": getattr(agent, "_anthropic_api_key", None),
+            "anthropic_base_url": getattr(agent, "_anthropic_base_url", None),
+            "is_anthropic_oauth": getattr(agent, "_is_anthropic_oauth", False),
         })
     return rt
 
