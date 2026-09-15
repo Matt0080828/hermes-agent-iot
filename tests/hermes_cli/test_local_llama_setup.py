@@ -2,10 +2,13 @@ from unittest.mock import patch
 
 
 def test_local_llama_setup_uses_safe_llama_server_defaults():
-    from hermes_cli import model_setup_flows
+    from hermes_cli import model_setup_flows, model_setup_flows_custom
 
     config = {}
-    with patch.object(model_setup_flows, "_model_flow_custom") as custom:
+    # Patch where the callee is defined: upstream moved ``_model_flow_custom``
+    # into model_setup_flows_custom, so patching the re-exported name in
+    # model_setup_flows no longer intercepts the call.
+    with patch.object(model_setup_flows_custom, "_model_flow_custom") as custom:
         model_setup_flows._model_flow_local_llama(config)
 
     custom.assert_called_once_with(

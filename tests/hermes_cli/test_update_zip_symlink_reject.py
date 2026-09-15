@@ -14,6 +14,7 @@ import zipfile
 from unittest.mock import patch
 
 import pytest
+from hermes_cli import update_cmd
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +52,7 @@ def test_update_via_zip_rejects_symlink_member(tmp_path, monkeypatch):
     fake_root.mkdir()
 
     from hermes_cli import main as hermes_main
-    from hermes_cli.main import _update_via_zip
+    from hermes_cli.update_cmd import _update_via_zip
 
     monkeypatch.setattr(hermes_main, "PROJECT_ROOT", fake_root)
 
@@ -130,7 +131,7 @@ def test_update_via_zip_accepts_normal_member(tmp_path, monkeypatch, capsys):
          patch("subprocess.check_call"):
         fake_run.return_value = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         try:
-            hermes_main._update_via_zip(args)
+            update_cmd._update_via_zip(args)
         except SystemExit:
             pass
 
