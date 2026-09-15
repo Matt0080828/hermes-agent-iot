@@ -1821,6 +1821,11 @@ _SWITCH_SNAPSHOT_FIELDS = (
     "_anthropic_client", "_anthropic_api_key", "_anthropic_base_url", "_is_anthropic_oauth",
     "_config_context_length", "_reasoning_echo_flag", "runtime_capabilities",
     "_credential_pool", "_credential_pool_entry_id",
+    "_transport_cache", "_custom_providers",
+    "_use_prompt_caching", "_use_native_cache_layout",
+    "reasoning_config", "_cached_system_prompt", "_consecutive_stale_streams",
+    "_primary_runtime", "_fallback_activated", "_fallback_index",
+    "_fallback_chain", "_fallback_model",
 )
 _MISSING = object()
 
@@ -2020,7 +2025,6 @@ def _resolve_switch_context_length(agent, snapshot):
         try:
             runtime_len = agent._ensure_lmstudio_runtime_loaded(intent)
         except Exception:
-            _restore_switch_snapshot(agent, snapshot)
             raise
     if hasattr(agent, "_lmstudio_load_was_unverified") and agent._lmstudio_load_was_unverified(runtime_len):
         logger.warning(
@@ -2051,6 +2055,11 @@ def _update_switch_compressor(agent, custom_providers, effective_context_length,
             agent.model, base_url=agent.base_url, api_key=ctx_api_key, provider=agent.provider,
             config_context_length=effective_context_length, custom_providers=custom_providers,
         )
+        from agent.model_metadata import get_minimum_tool_context_length, validate_tool_context_length
+
+        validate_tool_context_length(
+            agent.model, new_context_length, get_minimum_tool_context_length(agent),
+        )
         agent.context_compressor.update_model(
             model=agent.model,
             context_length=new_context_length,
@@ -2060,7 +2069,6 @@ def _update_switch_compressor(agent, custom_providers, effective_context_length,
             api_mode=agent.api_mode,
         )
     except Exception:
-        _restore_switch_snapshot(agent, snapshot)
         raise
 
 
@@ -2161,50 +2169,83 @@ def switch_model(
         agent, new_model, new_provider, base_url, api_mode, capabilities, old_norm, new_norm
     )
     snapshot = _snapshot_switch_state(agent)
+    _original_client_ids = {
+        id(_client)
+        for _client in (
+            snapshot.get("client", _MISSING),
+            snapshot.get("_anthropic_client", _MISSING),
+        )
+        if _client is not _MISSING and _client is not None
+    }
+
+    def _close_new_clients() -> None:
+        """Close clients built by this failed switch, never pre-switch clients."""
+        _closed_ids: set[int] = set()
+        for _name in ("client", "_anthropic_client"):
+            _client = getattr(agent, _name, None)
+            if (
+                _client is None
+                or id(_client) in _original_client_ids
+                or id(_client) in _closed_ids
+            ):
+                continue
+            _closed_ids.add(id(_client))
+            _close = getattr(_client, "close", None)
+            if callable(_close):
+                try:
+                    _close()
+                except Exception:
+                    logger.debug(
+                        "switch_model: failed to close newly-created %s",
+                        _name,
+                        exc_info=True,
+                    )
+
     try:
         _swap_switch_runtime(
             agent, new_model, new_provider, api_key, base_url, api_mode, old_provider, old_norm, new_norm
         )
+        custom_providers, effective_context_length = _resolve_switch_context_length(agent, snapshot)
+        # Refresh the custom-provider snapshot from the config just loaded so the prompt_caching lookup
+        # sees flags added to config.yaml after session start.
+        if custom_providers is not None:
+            agent._custom_providers = custom_providers
+        agent._use_prompt_caching, agent._use_native_cache_layout = agent._anthropic_prompt_cache_policy(
+            provider=new_provider, base_url=agent.base_url, api_mode=api_mode, model=new_model
+        )
+        if hasattr(agent, "context_compressor") and agent.context_compressor:
+            _update_switch_compressor(agent, custom_providers, effective_context_length, snapshot)
+        # Re-read the per-model reasoning_effort override so it applies immediately (per-model > global;
+        # YAML False = disabled).
+        try:
+            from hermes_constants import resolve_reasoning_config
+            from hermes_cli.config import load_config as _sm_load_config
+            agent.reasoning_config = resolve_reasoning_config(_sm_load_config() or {}, agent.model)
+            logger.info(
+                "switch_model: reasoning_config resolved for %s: %s", agent.model, agent.reasoning_config
+            )
+        except Exception as _reasoning_err:
+            logger.debug("switch_model: could not re-resolve reasoning_config: %s", _reasoning_err)
+        # Invalidate the cached system prompt so it rebuilds next turn.
+        agent._cached_system_prompt = None
+        # Publish the destination capability map only after every runtime setup above has succeeded.
+        # Failed switches must leave the old map intact.
+        agent.runtime_capabilities = destination_capabilities
+        # Reset the cross-turn stale-call circuit breaker; otherwise the latched streak keeps
+        # short-circuiting the freshly selected healthy provider.
+        from agent.chat_completion_helpers import _reset_stale_streak
+        _reset_stale_streak(agent)
+        agent._primary_runtime = _build_primary_runtime_snapshot(agent, api_mode)
+        _finish_switch(agent, new_provider, old_norm, new_norm)
+        logger.info(
+            "Model switched in-place: %s (%s) -> %s (%s)",
+            old_model, old_provider, new_model, new_provider,
+        )
+        _persist_switch_billing_route(agent)
     except Exception:
+        _close_new_clients()
         _restore_switch_snapshot(agent, snapshot)
         raise
-    custom_providers, effective_context_length = _resolve_switch_context_length(agent, snapshot)
-    # Refresh the custom-provider snapshot from the config just loaded so the prompt_caching lookup
-    # sees flags added to config.yaml after session start.
-    if custom_providers is not None:
-        agent._custom_providers = custom_providers
-    agent._use_prompt_caching, agent._use_native_cache_layout = agent._anthropic_prompt_cache_policy(
-        provider=new_provider, base_url=agent.base_url, api_mode=api_mode, model=new_model
-    )
-    if hasattr(agent, "context_compressor") and agent.context_compressor:
-        _update_switch_compressor(agent, custom_providers, effective_context_length, snapshot)
-    # Re-read the per-model reasoning_effort override so it applies immediately (per-model > global;
-    # YAML False = disabled).
-    try:
-        from hermes_constants import resolve_reasoning_config
-        from hermes_cli.config import load_config as _sm_load_config
-        agent.reasoning_config = resolve_reasoning_config(_sm_load_config() or {}, agent.model)
-        logger.info(
-            "switch_model: reasoning_config resolved for %s: %s", agent.model, agent.reasoning_config
-        )
-    except Exception as _reasoning_err:
-        logger.debug("switch_model: could not re-resolve reasoning_config: %s", _reasoning_err)
-    # Invalidate the cached system prompt so it rebuilds next turn.
-    agent._cached_system_prompt = None
-    # Publish the destination capability map only after every runtime setup above has succeeded.
-    # Failed switches must leave the old map intact.
-    agent.runtime_capabilities = destination_capabilities
-    # Reset the cross-turn stale-call circuit breaker; otherwise the latched streak keeps
-    # short-circuiting the freshly selected healthy provider.
-    from agent.chat_completion_helpers import _reset_stale_streak
-    _reset_stale_streak(agent)
-    agent._primary_runtime = _build_primary_runtime_snapshot(agent, api_mode)
-    _finish_switch(agent, new_provider, old_norm, new_norm)
-    logger.info(
-        "Model switched in-place: %s (%s) -> %s (%s)",
-        old_model, old_provider, new_model, new_provider,
-    )
-    _persist_switch_billing_route(agent)
 
 
 def _pre_tool_block_message(agent, function_name, function_args, effective_task_id, tool_call_id, middleware_trace):

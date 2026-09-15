@@ -384,29 +384,57 @@ def _ollama_context_limit_error(agent: Any, request_tokens: int) -> Optional[str
     if (
         not getattr(agent, "tools", None)
         or not isinstance(runtime_ctx, int)
-        or not 0 < runtime_ctx < MINIMUM_CONTEXT_LENGTH
+        or runtime_ctx <= 0
     ):
+        return None
+    from agent.model_metadata import get_minimum_tool_context_length
+
+    minimum_context = get_minimum_tool_context_length(agent)
+    if runtime_ctx >= minimum_context:
         return None
 
     model = getattr(agent, "model", "") or "the selected model"
+    provider = getattr(agent, "provider", "") or "unknown"
+    base_url = getattr(agent, "base_url", "") or "unknown base URL"
+    tool_count = len(getattr(agent, "tools", None) or [])
     logger.warning(
-        "Ollama runtime context too small for Hermes tool use: model=%s provider=%s base_url=%s "
-        "runtime_context=%d minimum_context=%d estimated_request_tokens=%d tool_count=%d session=%s",
-        model, getattr(agent, "provider", "") or "unknown",
-        getattr(agent, "base_url", "") or "unknown base URL", runtime_ctx, MINIMUM_CONTEXT_LENGTH,
-        request_tokens, len(getattr(agent, "tools", None) or []),
+        "Ollama runtime context too small for Hermes tool use: "
+        "model=%s provider=%s base_url=%s runtime_context=%d "
+        "minimum_context=%d estimated_request_tokens=%d tool_count=%d "
+        "session=%s",
+        model,
+        provider,
+        base_url,
+        runtime_ctx,
+        minimum_context,
+        request_tokens,
+        tool_count,
         getattr(agent, "session_id", None) or "none",
     )
-    return (
-        f"Ollama loaded `{model}` with only {runtime_ctx:,} tokens of runtime context, but Hermes "
-        f"needs at least {MINIMUM_CONTEXT_LENGTH:,} tokens for reliable tool use.\n\n"
-        "Increase the Ollama context for this model and restart/reload the model before trying "
-        "again. A known-good starting point is 65,536 tokens. In Hermes config, set "
-        "`model.ollama_num_ctx: 65536` (and `model.context_length: 65536` if you also override the "
-        "displayed model context). If you manage the model through an Ollama Modelfile, set "
-        "`PARAMETER num_ctx 65536` there instead."
-    )
 
+    if minimum_context == MINIMUM_CONTEXT_LENGTH:
+        guidance = (
+            "A known-good starting point is 65,536 tokens. In Hermes config, "
+            "set `model.ollama_num_ctx: 65536` (and `model.context_length: "
+            "65536` if you also override the displayed model context). If you "
+            "manage the model through an Ollama Modelfile, set `PARAMETER "
+            "num_ctx 65536` there instead."
+        )
+    else:
+        guidance = (
+            f"This profile lowers Hermes' tool-context floor to {minimum_context:,} "
+            "tokens for low-resource use. Increase `model.ollama_num_ctx` to at "
+            "least that value, or raise `agent.minimum_tool_context_length` when "
+            "you move the model to a stronger server."
+        )
+
+    return (
+        f"Ollama loaded `{model}` with only {runtime_ctx:,} tokens of runtime "
+        f"context, but Hermes needs at least {minimum_context:,} tokens "
+        "for reliable tool use.\n\n"
+        "Increase the Ollama context for this model and restart/reload the "
+        f"model before trying again. {guidance}"
+    )
 
 def _maybe_grow_local_window(agent: Any, compressor: Any,
                              request_tokens: int) -> Optional[int]:

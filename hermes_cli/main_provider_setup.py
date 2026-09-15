@@ -834,6 +834,7 @@ def _build_provider_picker_rows(config: dict, active: str, provider_labels: dict
              bool(active) and key == active)
 
     ordered.append(("custom", "Custom endpoint (enter URL manually)", []))
+    ordered.append(("local-llama", "Local AI (llama.cpp / llama-server)", []))
     if isinstance(config.get("custom_providers"), list) and config.get("custom_providers"):
         ordered.append(("remove-custom", "Remove a saved custom provider", []))
     ordered.append(("aux-config", "Configure auxiliary models...", []))

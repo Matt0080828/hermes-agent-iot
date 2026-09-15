@@ -19,7 +19,11 @@ from hermes_cli.model_setup_flows_common import (
     _load_config_model_section, _models_dev_merged, _oauth_gate, _persist_model, _pick_model_or_prompt,
     _print_numbered, _prompt_auth_credentials_choice,
     _run_login, _say, _show_curated)
-from hermes_cli.model_setup_flows_custom import _model_flow_custom, _model_flow_named_custom
+from hermes_cli.model_setup_flows_custom import (
+    _model_flow_custom,
+    _model_flow_local_llama,
+    _model_flow_named_custom,
+)
 from hermes_cli.model_setup_flows_azure import _model_flow_azure_foundry
 from hermes_cli.model_setup_flows_bedrock import _model_flow_bedrock
 

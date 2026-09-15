@@ -54,6 +54,7 @@ def _ts(description, tools=(), includes=(), **extra):
     return {"description": description, "tools": list(tools), "includes": list(includes), **extra}
 
 
+
 def _bundle(description, extras=()):
     """A `hermes-*` platform bundle: the shared core tools plus optional platform extras."""
     return _ts(description, _HERMES_CORE_TOOLS + list(extras))
@@ -145,6 +146,10 @@ TOOLSETS = {
     "code_execution": _ts("Run Python scripts that call tools programmatically (reduces LLM round trips)", ["execute_code"]),
     "delegation": _ts("Spawn subagents with isolated context for complex subtasks", ["delegate_task"]),
     "homeassistant": _ts("Home Assistant smart home control and monitoring", _HA_TOOLS),
+    "mqtt": _ts(
+        "MQTT IoT sensor and device control tools (publish, subscribe recent messages, command devices)",
+        ["mqtt_publish", "mqtt_subscribe_recent", "mqtt_device_command"],
+    ),
     "kanban": _ts(
         "Kanban multi-agent coordination — only active when the agent is spawned by "
         "the kanban dispatcher (HERMES_KANBAN_TASK env set). The dispatcher runs "

@@ -394,6 +394,33 @@ PROJECT_ROOT = Path(_startup_fast.project_root_str())
 _startup_fast.ensure_project_root_on_path()
 
 
+def _is_iot_install() -> bool:
+    """Return whether the active source/package is the protected IoT fork.
+
+    Detection is redundant for source vs wheel, but a user-writable
+    ``install-profile.json`` alone is not trusted: that file must not redirect
+    an official hermes-agent install onto ``pi2-lite``.
+    """
+    from importlib import metadata as importlib_metadata
+
+    try:
+        importlib_metadata.distribution("hermes-agent-iot")
+        return True
+    except importlib_metadata.PackageNotFoundError:
+        pass
+    except Exception:
+        pass
+
+    try:
+        import tomllib
+
+        with (PROJECT_ROOT / "pyproject.toml").open("rb") as stream:
+            project = tomllib.load(stream).get("project", {})
+        return project.get("name") == "hermes-agent-iot"
+    except (OSError, ValueError, TypeError):
+        return False
+
+
 # Profile override — MUST happen before any hermes module import: many modules
 # cache HERMES_HOME at import time. --profile/-p is pre-parsed from sys.argv,
 # HERMES_HOME set, and the flag stripped so argparse never sees it. Falls back
@@ -674,6 +701,7 @@ from hermes_cli.model_setup_flows import (
     _model_flow_qwen_oauth,
     _model_flow_minimax_oauth,
     _model_flow_custom,
+    _model_flow_local_llama,
     _model_flow_azure_foundry,
     _model_flow_named_custom,
     _model_flow_copilot,
@@ -1868,6 +1896,7 @@ _PROVIDER_MODEL_FLOWS = {
     "copilot-acp": lambda c, m, a: _model_flow_copilot_acp(c, m),
     "copilot": lambda c, m, a: _model_flow_copilot(c, m),
     "custom": lambda c, m, a: _model_flow_custom(c),
+    "local-llama": lambda c, m, a: _model_flow_local_llama(c),
     "anthropic": lambda c, m, a: _model_flow_anthropic(c, m),
     "kimi-coding": lambda c, m, a: _model_flow_kimi(c, m),
     "stepfun": lambda c, m, a: _model_flow_stepfun(c, m),

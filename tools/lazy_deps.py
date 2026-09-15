@@ -121,7 +121,9 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # uploaded to the Discord gateway fails to decode at att.read() with "Can not decode content-encoding:
     # br" — see #12511 / #15744.
     "platform.discord": (
-        "discord.py[voice]==2.7.1",
+        "discord.py==2.7.1",
+        "PyNaCl==1.6.2",
+        "davey==0.1.4",
         "brotlicffi==1.2.0.2",
         "aiohttp==3.14.3",
     ),
@@ -152,7 +154,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     "platform.teams": ("microsoft-teams-apps==2.0.13.4", "aiohttp==3.14.3"),
 
     # ─── Terminal backends ─────────────────────────────────────────────────
-    "terminal.modal": ("modal==1.3.4",),
+    "terminal.modal": ("modal==1.3.4", "cbor2==5.9.0"),
     "terminal.daytona": ("daytona==0.155.0",),
     "terminal.vercel": ("vercel==0.7.2",),
 
@@ -173,9 +175,9 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     "tool.acp": ("agent-client-protocol==0.9.0",),
     "tool.dashboard": (
         "fastapi==0.133.1",
-        "uvicorn[standard]==0.41.0",
-        "starlette==1.3.1",
-        "python-multipart==0.0.32",  # FastAPI UploadFile/Form streaming uploads
+        "uvicorn==0.41.0",
+        "starlette==1.3.1",  # CVE-2026-48710 (BadHost) — keep lazy-install in sync with pyproject [web]
+        "python-multipart==0.0.32",  # FastAPI UploadFile/Form for streaming uploads (NS-501)
     ),
     # Pillow and firecrawl-anydoc are CORE deps; these entries self-heal lean/partial installs.
     # Call sites use prompt=False so read_file / vision never block on input() mid-session.
@@ -183,6 +185,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # this entry is a belt-and-suspenders fallback for stripped/source-build installs that somehow dropped
     # it. See #40490.
     "tool.vision": ("Pillow==12.3.0",),
+    "tool.mqtt": ("paho-mqtt==2.1.0",),
     "tool.doc_extract": ("firecrawl-anydoc==0.2.4",),  # imports as `anydoc`; lockstep with pyproject
     # MCP client SDK for the cua-driver, so computer_use never dead-ends on `No module named 'mcp'`.
     "tool.computer_use": (

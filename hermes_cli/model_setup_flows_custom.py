@@ -51,10 +51,11 @@ def _probe_custom_endpoint(effective_key: str, effective_url: str) -> tuple[dict
     return probe, effective_url
 
 
-def _pick_detected_model(detected_models: list) -> str:
+def _pick_detected_model(detected_models: list, default_model: str = "") -> str:
     """Model-name step of the custom flow: confirm a single detection, number-pick from
     several, or type one. Raises KeyboardInterrupt/EOFError like the prompts it wraps."""
-    manual = "Model name (e.g. gpt-4, llama-3-70b): "
+    hint = f" [{default_model}]" if default_model else ""
+    manual = f"Model name (e.g. gpt-4, llama-3-70b){hint}: "
     if len(detected_models) == 1:
         print(f"  Detected model: {detected_models[0]}")
         if input("  Use this model? [Y/n]: ").strip().lower() in {"", "y", "yes"}:
@@ -67,19 +68,21 @@ def _pick_detected_model(detected_models: list) -> str:
         pick = input(f"  Select model [1-{len(detected_models)}] or type name: ").strip()
         if pick.isdigit() and 1 <= int(pick) <= len(detected_models):
             return detected_models[int(pick) - 1]
-        return pick
-    return line_input(manual).strip()
+        return pick or default_model
+    return line_input(manual).strip() or default_model
 
 
-def _model_flow_custom(config):
+def _model_flow_custom(config, *, preset=None):
     """Custom endpoint: collect URL, API key, and model name; also saved to ``custom_providers`` so
-    it appears in the provider menu on subsequent runs."""
+    it appears in the provider menu on subsequent runs. ``preset`` supplies local llama.cpp defaults."""
     from hermes_cli.main_provider_setup import _auto_provider_name, _prompt_custom_api_mode_selection, _save_custom_provider
     from hermes_cli.auth import _save_model_choice, deactivate_provider
     from hermes_cli.config import custom_endpoint_key_env, get_env_value, save_env_value
     from hermes_cli.secret_prompt import masked_secret_prompt
-    current_url = get_env_value("OPENAI_BASE_URL") or ""
-    current_key = get_env_value("OPENAI_API_KEY") or ""
+    preset = preset if isinstance(preset, dict) else {}
+    current_url = str(preset.get("base_url") or get_env_value("OPENAI_BASE_URL") or "")
+    current_key = str(preset.get("api_key") or get_env_value("OPENAI_API_KEY") or "")
+    default_model = str(preset.get("model") or "")
 
     print("Custom OpenAI-compatible endpoint configuration:")
     if current_url:
@@ -127,7 +130,7 @@ def _model_flow_custom(config):
 
     # Select model — use probe results when available, fall back to manual input
     try:
-        model_name = _pick_detected_model(probe.get("models") or [])
+        model_name = _pick_detected_model(probe.get("models") or [], default_model)
         context_length_str = line_input("Context length in tokens [leave blank for auto-detect]: ").strip()
         # Display name — shown in the provider menu on future runs
         default_name = _auto_provider_name(effective_url)
@@ -184,6 +187,18 @@ def _model_flow_custom(config):
     _save_custom_provider(effective_url, effective_key, model_name or "", context_length=context_length,
                           name=display_name, api_mode=api_mode, key_env=custom_key_env)
     _prune_replaced_custom_model_config_credentials(effective_url, provider_name=display_name)
+
+
+def _model_flow_local_llama(config):
+    """Configure a local llama.cpp/llama-server OpenAI-compatible endpoint."""
+    return _model_flow_custom(
+        config,
+        preset={
+            "base_url": "http://127.0.0.1:8080/v1",
+            "api_key": "local",
+            "model": "pi2-local",
+        },
+    )
 
 
 def _configured_model_ids(cfg_models) -> list[str]:

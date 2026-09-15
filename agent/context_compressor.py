@@ -1811,7 +1811,12 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         if self._threshold_tokens is None:
             # Resolve the window first: it may floor threshold_percent as a side effect.
             _ctx = self.context_length
-            self._threshold_tokens = self._compute_threshold_tokens(_ctx, self.threshold_percent, self.max_tokens)
+            self._threshold_tokens = self._compute_threshold_tokens(
+                _ctx,
+                self.threshold_percent,
+                self.max_tokens,
+                getattr(self, "minimum_context_length", MINIMUM_CONTEXT_LENGTH),
+            )
             self._apply_threshold_tokens_cap()
         return self._threshold_tokens
 
@@ -2193,7 +2198,12 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         # A switch that genuinely changes the output budget passes the new value explicitly. (#43547)
         if max_tokens is not None:
             self.max_tokens = self._coerce_max_tokens(max_tokens)
-        self.threshold_tokens = self._compute_threshold_tokens(context_length, self.threshold_percent, self.max_tokens)
+        self.threshold_tokens = self._compute_threshold_tokens(
+            context_length,
+            self.threshold_percent,
+            self.max_tokens,
+            getattr(self, "minimum_context_length", MINIMUM_CONTEXT_LENGTH),
+        )
         self._apply_threshold_tokens_cap()
         # Reset to None so the property recomputes via the mode-aware path (not the legacy formula).
         self._tail_token_budget = None
@@ -2258,7 +2268,10 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
 
     @staticmethod
     def _compute_threshold_tokens(
-        context_length: int, threshold_percent: float, max_tokens: int | None = None,
+        context_length: int,
+        threshold_percent: float,
+        max_tokens: int | None = None,
+        minimum_context_length: int = MINIMUM_CONTEXT_LENGTH,
     ) -> int:
         """Compute the compaction trigger in tokens from the effective input budget.
         Base is ``(context_length - max_tokens) * threshold_percent`` floored at MINIMUM_CONTEXT_LENGTH;
@@ -2281,7 +2294,7 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         if effective_window <= 0:
             effective_window = context_length
         pct_value = int(effective_window * threshold_percent)
-        floored = max(pct_value, MINIMUM_CONTEXT_LENGTH)
+        floored = max(pct_value, minimum_context_length)
         # The floor must not consume output headroom: cap at 85% when it is the binding term. Near-minimum windows
         # otherwise trigger at ~98%, and providers that silently clip over-window prompts (ollama) never raise the
         # overflow backstop, so the session wedges. An explicit threshold_percent above 85% is user intent; not capped.
@@ -2302,8 +2315,16 @@ class ContextCompressor(SummaryDispatchMixin, MicroCompactionMixin, ContextEngin
         proactive_prune_tokens: int = 0, proactive_prune_min_result_chars: int = 8000,
         proactive_prune_min_reclaim_tokens: int = 4096, min_tail_user_messages: int = 1, tail_mode: str = "lean",
         custom_providers: list | None = None,
+        minimum_context_length: int = MINIMUM_CONTEXT_LENGTH,
     ):
         self.model, self.base_url, self.api_key, self.provider, self.api_mode = model, base_url, api_key, provider, api_mode
+        try:
+            configured_minimum = int(minimum_context_length)
+        except (TypeError, ValueError):
+            configured_minimum = MINIMUM_CONTEXT_LENGTH
+        self.minimum_context_length = (
+            configured_minimum if configured_minimum > 0 else MINIMUM_CONTEXT_LENGTH
+        )
         # "lean" = small clamped tail + verbatim-user summary section; "legacy" = 0.20*window tail.
         self.tail_mode = tail_mode if tail_mode in ("legacy", "lean") else "lean"
         # Per-model context_length overrides live in custom_providers; without them deferred

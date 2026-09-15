@@ -1,9 +1,9 @@
 
 
 [project]
-name = "hermes-agent"
-version = "0.21.2"
-description = "The self-improving AI agent — creates skills from experience, improves them during use, and runs anywhere"
+name = "hermes-agent-iot"
+version = "0.21.2.post1"
+description = "IoT and low-resource packaging of Hermes Agent, maintained as a native-compatible fork"
 readme = "README.md"
 # Upper bound is load-bearing, not cosmetic. uv resolves the project's
 # Python from `requires-python`, and an inherited `UV_PYTHON` env var (or a
@@ -127,7 +127,7 @@ dependencies = [
   "pathspec==1.1.1",
   "fastapi>=0.104.0,<1",
   # CIDR-aware forwarded_allow_ips requires uvicorn >=0.31.0.
-  "uvicorn[standard]>=0.31.0,<1",
+  "uvicorn>=0.31.0,<1",
   # Streaming multipart uploads for the dashboard file manager (NS-501).
   # FastAPI's UploadFile/Form depend on python-multipart; it is NOT pulled in
   # by fastapi itself, so the dashboard's multipart upload endpoint would 500
@@ -273,6 +273,7 @@ mcp = ["mcp==2.0.0", "httpx2==2.7.0", "starlette==1.3.1"]  # starlette: CVE-2026
 # wheel targets and intentionally unavailable on other platforms.
 nemo-relay = []
 homeassistant = ["aiohttp==3.14.3"]
+mqtt = ["paho-mqtt==2.1.0"]
 sms = ["aiohttp==3.14.3"]
 teams = ["microsoft-teams-apps==2.0.13.4", "aiohttp==3.14.3"]  # aiohttp 3.14.3: prior CVEs + GHSA-cq5v-8q36-5273/GHSA-mfx4-hv73-q22v/GHSA-mq44-7p77-q5h7
 # Computer use — macOS background desktop control via cua-driver (MCP stdio).
@@ -301,22 +302,22 @@ azure-identity = ["azure-identity==1.25.3"]
 termux = [
   # Baseline Android / Termux path for reliable fresh installs.
   "python-telegram-bot[webhooks]==22.8",
-  "hermes-agent[cron]",
-  "hermes-agent[mcp]",
-  "hermes-agent[honcho]",
-  "hermes-agent[acp]",
+  "hermes-agent-iot[cron]",
+  "hermes-agent-iot[mcp]",
+  "hermes-agent-iot[honcho]",
+  "hermes-agent-iot[acp]",
 ]
 termux-all = [
   # Best-effort "install all" profile for Termux. Same policy as [all]:
   # only includes extras that aren't covered by `tools/lazy_deps.py`.
   # Backends like telegram/slack/dingtalk/feishu/honcho lazy-install at
   # first use, so they're no longer eager-installed here.
-  "hermes-agent[termux]",
-  "hermes-agent[google]",
-  "hermes-agent[homeassistant]",
-  "hermes-agent[sms]",
-  "hermes-agent[web]",
-  "hermes-agent[pty]",
+  "hermes-agent-iot[termux]",
+  "hermes-agent-iot[google]",
+  "hermes-agent-iot[homeassistant]",
+  "hermes-agent-iot[sms]",
+  "hermes-agent-iot[web]",
+  "hermes-agent-iot[pty]",
 ]
 dingtalk = ["dingtalk-stream==0.24.3", "alibabacloud-dingtalk==2.2.42", "qrcode==7.4.2"]
 feishu = ["lark-oapi==1.6.8", "qrcode==7.4.2"]
@@ -346,7 +347,7 @@ youtube = [
 # `hermes dashboard` (localhost SPA + API).  Not in core to keep the default install lean.
 # starlette==1.3.1 pinned for CVE-2026-48710 (BadHost) — fastapi pulls Starlette
 # transitively and pre-1.0.1 is the vulnerable range. See the mcp extra above.
-web = ["fastapi==0.133.1", "uvicorn[standard]==0.41.0", "starlette==1.3.1", "python-multipart==0.0.32"]
+web = ["fastapi==0.133.1", "uvicorn==0.41.0", "starlette==1.3.1", "python-multipart==0.0.32"]
 all = [
   # Policy (2026-05-12): `[all]` includes only extras that genuinely
   # CAN'T be lazy-installed via `tools/lazy_deps.py` — i.e. things every
@@ -369,16 +370,20 @@ all = [
   # [all], `uv sync --locked` on Windows tried to build it from sdist
   # and failed on `make`. Lazy-install routes that build to first use,
   # where the user is expected to have a toolchain available.
-  "hermes-agent[cron]",
-  "hermes-agent[pty]",
-  "hermes-agent[mcp]",
-  "hermes-agent[homeassistant]",
-  "hermes-agent[sms]",
-  "hermes-agent[acp]",
-  "hermes-agent[google]",
-  "hermes-agent[web]",
-  "hermes-agent[youtube]",
+  "hermes-agent-iot[cron]",
+  "hermes-agent-iot[pty]",
+  "hermes-agent-iot[mcp]",
+  "hermes-agent-iot[homeassistant]",
+  "hermes-agent-iot[sms]",
+  "hermes-agent-iot[acp]",
+  "hermes-agent-iot[google]",
+  "hermes-agent-iot[web]",
+  "hermes-agent-iot[youtube]",
 ]
+minimal = ["hermes-agent-iot[cli,pty]==0.21.2.post1"]
+iot = ["hermes-agent-iot[minimal,mcp,acp,homeassistant,mqtt,sms]==0.21.2.post1"]
+rag = ["hermes-agent-iot[iot,honcho]==0.21.2.post1"]
+full = ["hermes-agent-iot[all]==0.21.2.post1"]
 
 [build-system]
 # setuptools.build_meta + our setup.py bdist_wheel guard import wheel during
@@ -392,6 +397,7 @@ build-backend = "setuptools.build_meta"
 hermes = "hermes_cli.main:main"
 hermes-agent = "run_agent:main"
 hermes-acp = "acp_adapter.entry:main"
+hermes-iot = "hermes_cli.iot_cli:main"
 
 [tool.uv]
 override-dependencies = [
@@ -567,7 +573,7 @@ youtube-transcript-api = false
 include = ["agent", "agent.*", "tools", "tools.*", "hermes_cli", "hermes_cli.*", "gateway", "gateway.*", "tui_gateway", "tui_gateway.*", "cron", "cron.*", "acp_adapter", "plugins", "plugins.*", "providers", "providers.*"]
 
 [tool.setuptools.package-data]
-hermes_cli = ["observability/schemas/*.json", "data/*.json", "local_runtime/*.json"]
+hermes_cli = ["observability/schemas/*.json", "data/*.json", "local_runtime/*.json", "resources/profiles/*.yaml"]
 # gateway/assets/ ships status_phrases.yaml and the Telegram BotFather
 # screenshot. Without this, sealed venvs (uv2nix) silently lose both —
 # status phrases fall back to the tiny hardcoded set and the Telegram

@@ -1169,6 +1169,8 @@ def _build_uvicorn_server(host: str, port: int, *, ssh_isolated: bool = False):
 
     config = uvicorn.Config(
         served_app, host=host, port=port, log_level="warning",
+        # Force native asyncio so ARMv7 hosts never auto-select uvloop.
+        loop="asyncio",
         # Off by default so _ws_client_is_allowed sees the real peer, not
         # X-Forwarded-For. Gated mode runs behind a TLS terminator and needs
         # X-Forwarded-Proto for cookie Secure flags.

@@ -1187,5 +1187,13 @@ def _resolve_node_runtime_npm() -> str | None:
 
 
 def _resolve_update_branch(args) -> str:
-    """Normalize ``args.branch`` to a non-empty name (default ``main``; blank/whitespace = default)."""
-    return (getattr(args, "branch", None) or "main").strip() or "main"
+    """Resolve the update branch without detaching IoT installs from Pi2.
+
+    An explicit ``--branch`` always wins. Official Hermes defaults to ``main``;
+    hermes-agent-iot source/wheel installs default to ``pi2-lite``.
+    """
+    requested = (getattr(args, "branch", None) or "").strip()
+    if requested:
+        return requested
+    from hermes_cli import main as hermes_main
+    return "pi2-lite" if hermes_main._is_iot_install() else "main"

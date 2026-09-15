@@ -1304,6 +1304,9 @@ def _apply_agent_section(agent, _agent_cfg):
         agent._skill_nudge_interval = int(_agent_cfg.get("skills", {}).get("creation_nudge_interval", 10))
 
     _agent_section = _cfg_dict(_agent_cfg, "agent")
+    from agent.model_metadata import get_minimum_tool_context_length
+
+    agent._minimum_tool_context_length = get_minimum_tool_context_length(agent)
     agent.budget_warning_ratio = normalize_budget_warning_ratio(
         _agent_section.get("budget_warning_ratio")
     )
@@ -1847,6 +1850,7 @@ def _build_context_engine(agent, _agent_cfg, cs, _custom_providers, _effective_c
             proactive_prune_min_reclaim_tokens=cs.proactive_prune_min_reclaim,
             min_tail_user_messages=cs.min_tail_users, tail_mode=cs.tail_mode,
             custom_providers=_custom_providers,
+            minimum_context_length=getattr(agent, "_minimum_tool_context_length", None),
         )
     _bind_session_state = getattr(agent.context_compressor, "bind_session_state", None)
     if callable(_bind_session_state):
@@ -1883,10 +1887,9 @@ def _build_context_engine(agent, _agent_cfg, cs, _custom_providers, _effective_c
     agent.max_compression_attempts = cs.max_attempts
     agent.compression_idle_compact_after_seconds = cs.idle_compact_after_seconds
 
-
 def _enforce_minimum_context(agent):
-    # Reject windows below the 64K floor needed for reliable tool-calling; an explicit
-    # positive model.context_length on LM Studio is allowed below the floor.
+    # Reject windows below the configured tool-workflow floor (default 64K).
+    # An explicit positive model.context_length on LM Studio is allowed below the floor.
     _ctx = getattr(agent.context_compressor, "context_length", 0)
     _allow_lmstudio_explicit_below_floor = (
         str(agent.provider or "").strip().lower() == "lmstudio"
@@ -1894,16 +1897,13 @@ def _enforce_minimum_context(agent):
         and not isinstance(agent._config_context_length, bool)
         and agent._config_context_length > 0
     )
-    if _ctx and _ctx < MINIMUM_CONTEXT_LENGTH and not _allow_lmstudio_explicit_below_floor:
-        raise ValueError(
-            f"Model {agent.model} has a context window of {_ctx:,} tokens, "
-            f"which is below the minimum {MINIMUM_CONTEXT_LENGTH:,} required "
-            f"by Hermes Agent.  Choose a model with at least "
-            f"{MINIMUM_CONTEXT_LENGTH // 1000}K context.  If your server "
-            f"reports a window smaller than the model's true window, set "
-            f"model.context_length in config.yaml to the real value "
-            f"(this must be at least {MINIMUM_CONTEXT_LENGTH // 1000}K)."
-        )
+    if _allow_lmstudio_explicit_below_floor:
+        return
+    from agent.model_metadata import get_minimum_tool_context_length, validate_tool_context_length
+
+    validate_tool_context_length(
+        agent.model, _ctx, get_minimum_tool_context_length(agent),
+    )
 
 
 def _warn_nonagentic_hermes_model(agent):
