@@ -1838,15 +1838,50 @@ def _snapshot_switch_state(agent) -> Dict[str, Any]:
     snapshot = {name: getattr(agent, name, _MISSING) for name in _SWITCH_SNAPSHOT_FIELDS}
     # Shallow-copy the dict so mutating the live one doesn't poison the rollback target.
     snapshot["_client_kwargs"] = dict(getattr(agent, "_client_kwargs", {}) or {})
+    # Containers that the switch mutates in place are snapshotted by contents, not by reference:
+    # re-attaching the same object after the swap would hand back an emptied transport cache or a
+    # mutated compressor. Restoring into the live object keeps identity stable for its holders.
+    transport_cache = getattr(agent, "_transport_cache", None)
+    snapshot["_transport_cache_contents"] = (
+        dict(transport_cache) if isinstance(transport_cache, dict) else None
+    )
+    compressor = getattr(agent, "context_compressor", None)
+    snapshot["_compressor_state"] = (
+        dict(vars(compressor))
+        if compressor is not None and hasattr(compressor, "__dict__")
+        else None
+    )
     return snapshot
 
 
 def _restore_switch_snapshot(agent, snapshot: Dict[str, Any]) -> None:
+    transport_cache_contents = snapshot.get("_transport_cache_contents")
+    compressor_state = snapshot.get("_compressor_state")
     for name, value in snapshot.items():
+        if name in ("_transport_cache_contents", "_compressor_state"):
+            continue
         if value is _MISSING:
-            continue  # attribute did not exist before the swap; don't fabricate it
+            # Absent before the switch: drop whatever the swap built instead of leaving a
+            # fabricated default that downstream code would mistake for real state.
+            if hasattr(agent, name):
+                with contextlib.suppress(Exception):
+                    delattr(agent, name)
+            continue
         with contextlib.suppress(Exception):
             setattr(agent, name, value)
+    if compressor_state is not None:
+        compressor = getattr(agent, "context_compressor", None)
+        if compressor is not None and hasattr(compressor, "__dict__"):
+            with contextlib.suppress(Exception):
+                vars(compressor).clear()
+                vars(compressor).update(compressor_state)
+    if transport_cache_contents is not None:
+        transport_cache = getattr(agent, "_transport_cache", None)
+        if isinstance(transport_cache, dict):
+            with contextlib.suppress(Exception):
+                transport_cache.clear()
+                transport_cache.update(transport_cache_contents)
+                agent._transport_cache = transport_cache
 
 
 def _resolve_switch_destination(agent, new_model, new_provider, base_url, api_mode, capabilities, old_norm, new_norm):
