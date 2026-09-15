@@ -22,6 +22,9 @@ BANNED_DEFAULT_DEPS = (
     "torch",
     "sentence-transformers",
     "chromadb",
+    # No armv7/armv6 wheel; pip falls back to a source build needing libheif
+    # headers, which fails and takes the whole install down with it.
+    "pillow-heif",
 )
 
 

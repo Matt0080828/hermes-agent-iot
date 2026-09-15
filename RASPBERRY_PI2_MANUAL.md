@@ -572,6 +572,19 @@ printenv MQTT_HOST
 hermes tools list
 ```
 
+HEIC／HEIF（iPhone 照片）無法使用：
+
+`pillow-heif` 是**選用**依賴，armv7／armv6 沒有預編 wheel，所以 `minimal`／`iot`
+profile 不會安裝它（裝了會讓整個安裝失敗）。需要時自行安裝：
+
+```bash
+python -m pip install pillow-heif
+python -c 'import pillow_heif; print("pillow-heif ok")'
+```
+
+未安裝時視覺路徑會回報可執行的錯誤訊息（提示安裝 `pillow-heif`）而不是莫名失敗；
+AVIF 由 Pillow ≥ 11.3 原生支援，不受影響。
+
 Model context 被拒絕時，確認兩者一致：
 
 ```yaml
