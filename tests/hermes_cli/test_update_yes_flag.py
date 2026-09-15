@@ -18,6 +18,14 @@ from hermes_cli.main import cmd_update
 
 
 @pytest.fixture(autouse=True)
+def _official_update_default():
+    """The upstream update suite exercises official-Hermes semantics; the IoT fork
+    defaults `hermes update` to the pi2-lite branch, which these tests do not cover."""
+    with patch("hermes_cli.main._is_iot_install", return_value=False):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_update(isolated_update_runtime, monkeypatch):
     import shutil
     from hermes_cli import managed_uv, update_cmd

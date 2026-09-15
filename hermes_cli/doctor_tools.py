@@ -204,8 +204,8 @@ def _check_vercel_backend(issues: list[str]) -> None:
              ("Vercel disk setting", "(uses platform default)"), ("Vercel custom disk unsupported", "(reset terminal.container_disk to 51200)"),
              "Vercel Sandbox does not support custom container_disk; use the shared default 51200", issues)
     _require(importlib.util.find_spec("vercel") is not None, ("vercel SDK", "(installed)"),
-             ("vercel SDK not installed", "(pip install 'hermes-agent[vercel]')"),
-             "Install the Vercel optional dependency: pip install 'hermes-agent[vercel]'", issues)
+             ("vercel SDK not installed", "(python -m pip install vercel==0.7.2)"),
+             "Install the Vercel optional dependency: python -m pip install vercel==0.7.2", issues)
     auth_status = describe_vercel_auth()
     if auth_status.ok:
         check_ok("Vercel auth", f"({auth_status.label})")

@@ -1713,20 +1713,22 @@ def _lower_threshold_to_aux_context(
     if main_ctx:
         compressor.threshold_percent = new_threshold / main_ctx
     safe_pct = int((aux_context / main_ctx) * 100) if main_ctx else 50
-    # Mirror the compressor's threshold math (percent floor, output reservation, 64K floor): a suggestion it
+    # Mirror the compressor's threshold math (percent floor, output reservation, profile floor): a suggestion it
     # would override is silently ignored and this warning reappears every session. External engines: keep it plain.
     # The "lower the threshold" suggestion must survive the built-in trigger recomputation (#67422):
     # _effective_threshold_percent() raises sub-75% values back up for main windows under 512K, and
-    # _compute_threshold_tokens() further applies the output-token reservation, the 64K floor, and the
+    # _compute_threshold_tokens() further applies the output-token reservation, the profile floor, and the
     # degenerate-window guard. Recommending a value those would override is silently ignored and this
     # warning would reappear every session — so mirror the compressor's own math and only offer the option
     # when the recomputed trigger actually fits the auxiliary model's context.
     from agent.context_compressor import ContextCompressor as _CC
+    from agent.model_metadata import get_minimum_tool_context_length
     recomputed_threshold = None
     if main_ctx and isinstance(compressor, _CC):
         recomputed_threshold = _CC._compute_threshold_tokens(
             main_ctx, _CC._effective_threshold_percent(main_ctx, safe_pct / 100),
             getattr(compressor, "max_tokens", None),
+            get_minimum_tool_context_length(agent),
         )
     threshold_suggestion_viable = recomputed_threshold is None or recomputed_threshold <= aux_context
     # "model (provider)" labels for both sides; empty/"auto" provider falls back to the client's base_url hostname.
@@ -1789,7 +1791,7 @@ def check_compression_model_feasibility(agent: Any) -> None:
             _resolve_task_provider_model, _try_configured_fallback_for_unavailable_client,
             get_text_auxiliary_client,
         )
-        from agent.model_metadata import MINIMUM_CONTEXT_LENGTH, get_model_context_length
+        from agent.model_metadata import get_minimum_tool_context_length, get_model_context_length
         # Provider may be "auto"; fall back to the client's base_url hostname so the
         # user can tell where the compression model is actually called.
         try:
@@ -1843,14 +1845,16 @@ def check_compression_model_feasibility(agent: Any) -> None:
                 aux_model, base_url=aux_base_url, api_key=aux_api_key, config_context_length=_aux_cfg_ctx,
                 provider=_aux_provider, custom_providers=agent._custom_providers,
             )
-        # Aux model must meet MINIMUM_CONTEXT_LENGTH like the main model, else it cannot summarise a full window.
-        if aux_context and aux_context < MINIMUM_CONTEXT_LENGTH:
+        # The auxiliary model must meet the same profile floor as the main runtime so constrained
+        # profiles do not silently reintroduce 64K.
+        minimum_context_length = get_minimum_tool_context_length(agent)
+        if aux_context and aux_context < minimum_context_length:
             raise ValueError(
                 f"Auxiliary compression model {aux_model} has a context "
                 f"window of {aux_context:,} tokens, which is below the "
-                f"minimum {MINIMUM_CONTEXT_LENGTH:,} required by Hermes "
+                f"minimum {minimum_context_length:,} required by Hermes "
                 f"Agent.  Choose a compression model with at least "
-                f"{MINIMUM_CONTEXT_LENGTH // 1000}K context (set "
+                f"{minimum_context_length:,} tokens of context (set "
                 f"auxiliary.compression.model in config.yaml), or set "
                 f"auxiliary.compression.context_length to override the "
                 f"detected value if it is wrong."

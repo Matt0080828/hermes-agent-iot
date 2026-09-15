@@ -15,8 +15,15 @@ def _append_warning(result: ModelSwitchResult, text: str) -> None:
         result.warning_message = text
 
 
-def _threshold_tokens(context_length: int, threshold_percent: float) -> int:
-    return max(int(context_length * threshold_percent), MINIMUM_CONTEXT_LENGTH)
+def _threshold_tokens(
+    context_length: int,
+    threshold_percent: float,
+    minimum_context_length: int = MINIMUM_CONTEXT_LENGTH,
+) -> int:
+    threshold = max(int(context_length * threshold_percent), minimum_context_length)
+    if threshold >= context_length:
+        return int(context_length * 0.85)
+    return threshold
 
 
 def _estimate_tokens(agent: Any, messages: Optional[List[dict]]) -> Optional[int]:
@@ -94,7 +101,12 @@ def merge_preflight_compression_warning(
     if estimate is None:
         return
 
-    new_threshold = _threshold_tokens(new_ctx, float(getattr(cc, "threshold_percent", 0.5)))
+    from agent.model_metadata import get_minimum_tool_context_length
+
+    new_threshold = _threshold_tokens(
+        new_ctx,
+        float(getattr(cc, "threshold_percent", 0.5)),
+        get_minimum_tool_context_length(agent))
     if estimate < new_threshold:
         return
 

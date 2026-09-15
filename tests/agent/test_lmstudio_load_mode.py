@@ -37,12 +37,20 @@ def test_lmstudio_jit_load_mode_skips_explicit_preload(monkeypatch):
 
 
 
-def test_explicit_budget_below_loaded_runtime_limits_effective_context():
+def test_verified_runtime_context_is_authoritative_over_lower_explicit_budget():
+    """Fork policy: the context LM Studio reports as actually loaded wins over a lower
+    preload hint, so the compression budget matches the real runtime window."""
     result = AIAgent._effective_lmstudio_context_length(
         80_000,
         LMStudioLoadResult(120_000),
     )
 
-    assert result == 80_000
+    assert result == 120_000
+
+
+def test_explicit_budget_is_used_when_runtime_does_not_report_one():
+    """Without a verified runtime context the explicit config value is the only budget."""
+    assert AIAgent._effective_lmstudio_context_length(80_000, None) == 80_000
+    assert AIAgent._effective_lmstudio_context_length(None, None) is None
 
 

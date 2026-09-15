@@ -190,7 +190,7 @@ def _hermes_version() -> str:
         return __version__
     try:
         from importlib.metadata import version
-        return version("hermes-agent")
+        return version("hermes-agent-iot")
     except Exception:
         return "dev"
 

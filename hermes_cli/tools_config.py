@@ -73,6 +73,7 @@ CONFIGURABLE_TOOLSETS = [
     ("delegation",      "👥 Task Delegation",           "delegate_task"),
     ("cronjob",         "⏰ Cron Jobs",                 "create/list/update/pause/resume/run, with optional attached skills"),
     ("homeassistant",    "🏠 Home Assistant",           "smart home device control"),
+    ("mqtt",             "📡 MQTT IoT",                 "publish/subscribe sensor and device topics"),
     ("spotify",          "🎵 Spotify",                  "playback, search, playlists, library"),
     ("discord",         "💬 Discord (read/participate)", "fetch messages, search members, create thread"),
     ("discord_admin",   "🛡️  Discord Server Admin",    "list channels/roles, pin, assign roles"),
@@ -343,6 +344,24 @@ TOOL_CATEGORIES = {
             _row("Home Assistant", tag="REST API integration",
                  env_vars=[_key("HASS_TOKEN", "Home Assistant Long-Lived Access Token"),
                            _key("HASS_URL", "Home Assistant URL", default="http://homeassistant.local:8123")]),
+        ],
+    },
+    "mqtt": {
+        "name": "MQTT IoT",
+        "icon": "📡",
+        "providers": [
+            {
+                "name": "MQTT Broker",
+                "tag": "Lightweight IoT sensor/device topics via paho-mqtt",
+                "env_vars": [
+                    {"key": "MQTT_HOST", "prompt": "MQTT broker host/IP", "default": "localhost"},
+                    {"key": "MQTT_PORT", "prompt": "MQTT broker port", "default": "1883"},
+                    {"key": "MQTT_USERNAME", "prompt": "MQTT username (optional)", "optional": True},
+                    {"key": "MQTT_PASSWORD", "prompt": "MQTT password (optional)", "optional": True},
+                    {"key": "MQTT_CLIENT_ID", "prompt": "MQTT client ID prefix (optional)", "optional": True},
+                    {"key": "MQTT_TLS", "prompt": "Use TLS? true/false", "default": "false", "optional": True},
+                ],
+            },
         ],
     },
     "spotify": {

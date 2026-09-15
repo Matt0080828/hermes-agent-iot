@@ -1305,6 +1305,10 @@ def _apply_agent_section(agent, _agent_cfg):
     _agent_section = _cfg_dict(_agent_cfg, "agent")
     from agent.model_metadata import get_minimum_tool_context_length
 
+    # Seed the profile floor from config before normalising it: get_minimum_tool_context_length()
+    # reads the attribute when an agent is passed, so without this the Pi2 profiles' lowered
+    # floor (agent.minimum_tool_context_length) would silently fall back to the 64K default.
+    agent._minimum_tool_context_length = _agent_section.get("minimum_tool_context_length")
     agent._minimum_tool_context_length = get_minimum_tool_context_length(agent)
     agent.budget_warning_ratio = normalize_budget_warning_ratio(
         _agent_section.get("budget_warning_ratio")

@@ -1650,6 +1650,112 @@ def _fallback_reason_text(reason: "FailoverReason | None") -> str:
     return label or str(getattr(reason, "value", None) or reason or "provider failure").replace("_", " ")
 
 
+_FALLBACK_RUNTIME_FIELDS = (
+    "_config_context_length",
+    "model",
+    "provider",
+    "requested_provider",
+    "base_url",
+    "api_mode",
+    "_fallback_activated",
+    "_provider_fallback_active",
+    "_provider_fallback_route",
+    "_credential_pool",
+    "_credential_pool_entry_id",
+    "api_key",
+    "_anthropic_api_key",
+    "_anthropic_base_url",
+    "_anthropic_client",
+    "_is_anthropic_oauth",
+    "client",
+    "_client_kwargs",
+    "_use_prompt_caching",
+    "_use_native_cache_layout",
+    "_reasoning_echo_flag",
+    "reasoning_config",
+    "_cached_system_prompt",
+    "_pending_fallback_notice",
+    "_primary_runtime",
+)
+_FALLBACK_MISSING = object()
+
+
+def _snapshot_fallback_runtime(agent) -> dict[str, Any]:
+    """Capture live state that a fallback candidate may mutate."""
+    snapshot: dict[str, Any] = {
+        "fields": {
+            name: getattr(agent, name, _FALLBACK_MISSING)
+            for name in _FALLBACK_RUNTIME_FIELDS
+        },
+    }
+    transport_cache = getattr(agent, "_transport_cache", _FALLBACK_MISSING)
+    snapshot["transport_cache"] = transport_cache
+    snapshot["transport_cache_contents"] = (
+        dict(transport_cache) if isinstance(transport_cache, dict) else None
+    )
+    compressor = getattr(agent, "context_compressor", _FALLBACK_MISSING)
+    snapshot["compressor"] = compressor
+    snapshot["compressor_state"] = (
+        dict(vars(compressor))
+        if compressor is not _FALLBACK_MISSING and compressor is not None
+        else None
+    )
+    return snapshot
+
+
+def _restore_fallback_runtime(agent, snapshot: dict) -> None:
+    """Rollback a failed candidate without changing long-lived object identity."""
+    for name, value in snapshot["fields"].items():
+        if value is _FALLBACK_MISSING:
+            if hasattr(agent, name):
+                delattr(agent, name)
+        else:
+            setattr(agent, name, value)
+
+    transport_cache = snapshot["transport_cache"]
+    if transport_cache is _FALLBACK_MISSING:
+        if hasattr(agent, "_transport_cache"):
+            delattr(agent, "_transport_cache")
+    else:
+        setattr(agent, "_transport_cache", transport_cache)
+        if isinstance(transport_cache, dict):
+            transport_cache.clear()
+            transport_cache.update(snapshot["transport_cache_contents"] or {})
+
+    compressor = snapshot["compressor"]
+    if compressor is _FALLBACK_MISSING:
+        if hasattr(agent, "context_compressor"):
+            delattr(agent, "context_compressor")
+    else:
+        setattr(agent, "context_compressor", compressor)
+        compressor_state = snapshot["compressor_state"]
+        if compressor is not None and compressor_state is not None:
+            vars(compressor).clear()
+            vars(compressor).update(compressor_state)
+
+
+def _close_candidate_clients(snapshot: dict, *clients: Any) -> None:
+    """Close candidate-owned clients once, never pre-existing runtime clients."""
+    preexisting = {
+        snapshot["fields"].get("client"),
+        snapshot["fields"].get("_anthropic_client"),
+    }
+    closed: set[int] = set()
+    for client in clients:
+        if client is None or client is _FALLBACK_MISSING or client in preexisting:
+            continue
+        identity = id(client)
+        if identity in closed:
+            continue
+        closed.add(identity)
+        close = getattr(client, "close", None)
+        if callable(close):
+            try:
+                close()
+            except Exception:
+                logger.debug("Failed to close rejected fallback client", exc_info=True)
+
+
 def _is_anthropic_wire_url(url: str) -> bool:
     """Same Messages-only host match as determine_api_mode() / _detect_api_mode_for_url(): api.anthropic.com,
     a /anthropic suffix, or Kimi Code's api.kimi.com/coding (its /chat/completions 404s — #77256)."""
@@ -1759,20 +1865,23 @@ def _should_skip_fallback_candidate(agent, fb: dict, fb_key: tuple, fb_provider:
     return False
 
 
-def _update_fallback_context_compressor(agent) -> None:
+def _update_fallback_context_compressor(agent, context_length: int | None = None) -> None:
     """Point compression limits at the fallback model's context window (not the primary's),
-    respecting the explicit model.context_length config override."""
+    reusing the window resolved before activation when supplied so the swap does not probe
+    provider metadata a second time after the runtime was already mutated."""
     compressor = getattr(agent, "context_compressor", None)
     if not compressor:
         return
-    from agent.model_metadata import get_model_context_length
-    fb_context_length = get_model_context_length(
-        agent.model, base_url=agent.base_url,
-        api_key=agent.api_key if isinstance(agent.api_key, str) else "",  # callable (Entra ID) → probes need str
-        provider=agent.provider,
-        config_context_length=getattr(agent, "_config_context_length", None),
-        custom_providers=getattr(agent, "_custom_providers", None),
-    )
+    fb_context_length = context_length
+    if fb_context_length is None:
+        from agent.model_metadata import get_model_context_length
+        fb_context_length = get_model_context_length(
+            agent.model, base_url=agent.base_url,
+            api_key=agent.api_key if isinstance(agent.api_key, str) else "",  # callable (Entra ID) → probes need str
+            provider=agent.provider,
+            config_context_length=getattr(agent, "_config_context_length", None),
+            custom_providers=getattr(agent, "_custom_providers", None),
+        )
     compressor.update_model(  # callable api_key preserved → call_llm
         model=agent.model, context_length=fb_context_length, base_url=agent.base_url,
         api_key=getattr(agent, "api_key", ""), provider=agent.provider, api_mode=agent.api_mode,
@@ -1848,6 +1957,10 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
         if _should_skip_fallback_candidate(agent, fb, fb_key, fb_provider, fb_model, unavailable):
             continue
 
+        # Snapshot before candidate construction: provider routers and native-client
+        # factories are allowed to touch live state and must remain transactional.
+        runtime_snapshot = _snapshot_fallback_runtime(agent)
+        fb_client = None
         try:
             from agent.auxiliary_client import resolve_provider_client
             from hermes_cli.fallback_config import resolve_entry_api_key
@@ -1881,12 +1994,51 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             elif not fb_api_mode_explicit and fb_api_mode == "chat_completions":
                 fb_api_mode = _fallback_api_mode_resolved(agent, fb_provider, fb_model, fb_base_url)
 
+            # Resolve and validate the candidate context window before mutating any
+            # live runtime state. A constrained profile may lower the default 64K
+            # floor, but every fallback still has to satisfy that instance floor.
+            from agent.model_metadata import (
+                get_minimum_tool_context_length,
+                get_model_context_length,
+                validate_tool_context_length,
+            )
+
+            fb_config_context_length = fb.get("context_length")
+            if isinstance(fb_config_context_length, bool):
+                fb_config_context_length = None
+            elif fb_config_context_length is not None:
+                try:
+                    fb_config_context_length = int(fb_config_context_length)
+                except (TypeError, ValueError):
+                    fb_config_context_length = None
+                if fb_config_context_length is not None and fb_config_context_length <= 0:
+                    fb_config_context_length = None
+
+            fb_context_length = get_model_context_length(
+                fb_model,
+                base_url=fb_base_url,
+                api_key=fb_client.api_key if isinstance(fb_client.api_key, str) else "",
+                provider=fb_provider,
+                config_context_length=fb_config_context_length,
+                custom_providers=getattr(agent, "_custom_providers", None),
+            )
+            try:
+                validate_tool_context_length(
+                    fb_model,
+                    fb_context_length,
+                    get_minimum_tool_context_length(agent),
+                )
+            except ValueError as exc:
+                logger.warning("Fallback skip: %s", exc)
+                _restore_fallback_runtime(agent, runtime_snapshot)
+                _close_candidate_clients(runtime_snapshot, fb_client)
+                continue
+
             old_model, old_provider, old_base_url = agent.model, agent.provider, agent.base_url
 
-            # Clear the per-config context_length override so the fallback model's own context
-            # window is resolved instead of the previous model's stale value.
-            # See #22387.
-            agent._config_context_length = None
+            # Replace the primary model's pin with the fallback entry's own pin;
+            # never inherit a stale context_length across providers (#22387).
+            agent._config_context_length = fb_config_context_length
             agent.model, agent.provider, agent.requested_provider = fb_model, fb_provider, fb_provider
             agent.base_url, agent.api_mode = fb_base_url, fb_api_mode
             # reasoning_content echo opt-in travels with the active provider; restore_primary_runtime reverts it.
@@ -1898,6 +2050,10 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             _rebind_fallback_credential_pool(agent, fb_provider, fb_model)
             from agent.client_lifecycle import _swap_fallback_clients
             _swap_fallback_clients(agent, fb_client, fb_provider, fb_model, fb_base_url, fb_api_mode)
+            if fb_api_mode == "anthropic_messages" and getattr(agent, "client", None) is None:
+                # The router's preliminary OpenAI-shaped client is superseded by the
+                # native Anthropic client and is no longer runtime-owned.
+                _close_candidate_clients(runtime_snapshot, fb_client)
 
             from agent.agent_runtime_helpers import sync_credential_pool_entry_id
             sync_credential_pool_entry_id(agent)
@@ -1905,7 +2061,7 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             agent._use_prompt_caching, agent._use_native_cache_layout = agent._anthropic_prompt_cache_policy(
                 provider=fb_provider, base_url=fb_base_url, api_mode=fb_api_mode, model=fb_model)
             agent._ensure_lmstudio_runtime_loaded()  # LM Studio: preload before probing context length
-            _update_fallback_context_compressor(agent)
+            _update_fallback_context_compressor(agent, fb_context_length)
             _reresolve_fallback_reasoning_config(agent)
             _rescope_fallback_extra_body(agent, old_model, old_provider, old_base_url)
             rewrite_prompt_model_identity(agent, fb_model, fb_provider)
@@ -1933,6 +2089,13 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             if fb_provider == "nous":
                 unavailable.add(fb_key)
             logger.error("Failed to activate fallback %s: %s", fb_model, e)
+            # Roll the runtime back before trying the next candidate: a half-applied
+            # fallback must never leak into the chain or the caller's session state.
+            candidate_client = getattr(agent, "client", None)
+            candidate_anthropic_client = getattr(agent, "_anthropic_client", None)
+            _restore_fallback_runtime(agent, runtime_snapshot)
+            _close_candidate_clients(
+                runtime_snapshot, fb_client, candidate_client, candidate_anthropic_client)
             continue  # try next in chain
 
 

@@ -904,7 +904,7 @@ class WeixinAdapter(OwnAccessPolicyMixin, BasePlatformAdapter):
         from gateway.session import build_session_key
         return build_session_key(
             event.source, group_sessions_per_user=self.config.extra.get("group_sessions_per_user", True),
-            thread_sessions_per_user=self.config.extra.get("thread_sessions_per_user", False), profile=event.source.profile)
+            thread_sessions_per_user=self.config.extra.get("thread_sessions_per_user", False), profile=self._session_key_profile(event.source))
 
     async def _collect_media(self, item: Dict[str, Any], media_paths: List[str], media_types: List[str]) -> None:
         spec = _INBOUND_MEDIA.get(item.get("type"))

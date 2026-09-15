@@ -2,7 +2,7 @@
 
 Maps gateway monitoring events to OTel spans for the operator-configured ``monitoring.export.otlp``
 endpoint (no default destination ships) and hosts the OTLP plumbing shared with
-``gateway_health_export``.  The OTel SDK is an optional extra (``hermes-agent[otlp]``) imported
+``gateway_health_export``.  The OTel SDK is an optional extra (``hermes-agent-iot[otlp]``) imported
 lazily; ``headers_env`` values are read at export time and never logged or stored.  The streaming
 subscriber runs fail-isolated on the emitter thread; ``event_filter`` keeps other planes off it.
 """
@@ -63,7 +63,7 @@ def _require_sdk(names: Iterable[str] = _SPAN_SDK, *, auto_install: bool = True,
     except Exception as e:  # ImportError or partial install
         raise OTLPUnavailable(
             "OTLP export requires the optional dependency. Install with:\n"
-            "    pip install 'hermes-agent[otlp]'\n"
+            "    pip install 'hermes-agent-iot[otlp]'\n"
             f"(import error: {e})"
         )
 
@@ -270,7 +270,7 @@ def start_streaming(
         _require_sdk(prompt=False)
     except OTLPUnavailable:
         logger.warning("monitoring.export.otlp.enabled but the OTel SDK could not "
-                       "be installed/imported; install 'hermes-agent[otlp]'")
+                       "be installed/imported; install 'hermes-agent-iot[otlp]'")
         return None
     from agent.monitoring.emitter import get_emitter
     streamer = OTLPStreamer(config, event_filter=event_filter)
