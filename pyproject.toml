@@ -186,6 +186,12 @@ dependencies = [
   "nemo-relay>=0.8.3,<0.9; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64' and 'android' not in platform_release) or (sys_platform == 'linux' and platform_machine == 'aarch64' and 'android' not in platform_release) or (sys_platform == 'win32' and platform_machine == 'AMD64') or (sys_platform == 'win32' and platform_machine == 'ARM64')",
 ]
 
+[project.urls]
+Homepage = "https://github.com/matttest0080-prog/hermes-agent-iot"
+Repository = "https://github.com/matttest0080-prog/hermes-agent-iot"
+Documentation = "https://github.com/matttest0080-prog/hermes-agent-iot/blob/pi2-lite/README_PI2.md"
+"Upstream project" = "https://github.com/NousResearch/hermes-agent"
+
 [project.optional-dependencies]
 # Native Anthropic provider — only needed when provider=anthropic (not via
 # OpenRouter or other aggregators).
@@ -200,11 +206,11 @@ fal = ["fal-client==0.13.1"]
 # Edge TTS — default TTS provider but still optional (users can pick
 # ElevenLabs / OpenAI / MiniMax instead).
 edge-tts = ["edge-tts==7.2.7"]
-modal = ["modal==1.3.4"]
+modal = ["modal==1.3.4", "cbor2==5.9.0; platform_machine == 'armv7l'"]
 daytona = ["daytona==0.155.0"]
 vercel = ["vercel==0.7.2"]
 hindsight = ["hindsight-client==0.6.1"]
-dev = ["debugpy==1.8.20", "pytest==9.1.1", "pytest-asyncio==1.3.0", "mcp==2.0.0", "httpx2==2.7.0", "starlette==1.3.1", "ty==0.0.21", "ruff==0.15.10", "setuptools==83.0.0"]  # starlette: CVE-2026-48710; setuptools: 83 (torch >=2.13 requires setuptools 83)
+dev = ["hermes-agent-iot[full]==0.21.3.post1", "build==1.3.0", "twine==6.2.0", "debugpy==1.8.20", "pytest==9.1.1", "pytest-asyncio==1.3.0", "mcp==2.0.0", "httpx2==2.7.0", "starlette==1.3.1", "ty==0.0.21", "ruff==0.15.10", "setuptools==83.0.0"]  # fork [full] plus upstream dev and the release tools (build/twine) the tag-triggered publish workflow syncs; starlette: CVE-2026-48710; setuptools: 83 (torch >=2.13 requires setuptools 83)
 messaging = ["python-telegram-bot[webhooks]==22.8", "discord.py[voice]==2.7.1", "aiohttp==3.14.3", "brotlicffi==1.2.0.2", "slack-bolt==1.30.0", "slack-sdk==3.44.1", "qrcode==7.4.2"]  # aiohttp 3.14.3: prior CVEs + GHSA-cq5v-8q36-5273/GHSA-mfx4-hv73-q22v/GHSA-mq44-7p77-q5h7
 cron = []  # croniter is now a core dependency; this extra kept for back-compat
 slack = ["slack-bolt==1.30.0", "slack-sdk==3.44.1", "aiohttp==3.14.3"]
@@ -421,12 +427,20 @@ hermes-acp = "acp_adapter.entry:main"
 hermes-iot = "hermes_cli.iot_cli:main"
 
 [tool.uv]
+conflicts = [
+  # Vercel 0.7.2 requires cbor2>=6 while the ARMv7 Modal compatibility path
+  # intentionally pins cbor2 5.9.0. They are separate lazy capabilities and
+  # must not be resolved into one environment as simultaneous extras.
+  [{ extra = "modal" }, { extra = "vercel" }],
+]
 override-dependencies = [
   # discord.py's latest published version, 2.7.1, pins pynacl at <1.6. however, pynacl 1.5.0 has known vulnerabilities.
   # discord.py has updated pynacl to 1.6 on `main`, but has not yet published a patch release.
   # so, we force-override this to pynacl 1.6. here.
   # remove this when we update discord.py
   "pynacl>=1.6,<1.7",
+  # Remove once grpclib publishes a dependency floor that excludes vulnerable h2.
+  "h2>=4.4.1",
   # alibabacloud-tea-openapi caps cryptography<49, and its latest release
   # still does. Without this override, that cap holds cryptography at 48.0.1
   # and its three advisories (see the cryptography pin in
@@ -495,11 +509,14 @@ asyncpg = false
 azure-identity = false
 boto3 = false
 brotlicffi = false
+build = false
+cbor2 = false
 certifi = false
 concurrent-log-handler = false
 croniter = false
 cryptography = false
 daytona = false
+davey = false
 debugpy = false
 defusedxml = false
 dingtalk-stream = false
@@ -521,6 +538,7 @@ google-cloud-pubsub = false
 h2 = false
 hindsight-client = false
 honcho-ai = false
+hermes-agent-iot = false
 httplib2 = false
 httpx = false
 httpx2 = false
@@ -543,6 +561,7 @@ opentelemetry-exporter-otlp-proto-http = false
 opentelemetry-sdk = false
 openwakeword = false
 packaging = false
+paho-mqtt = false
 parallel-web = false
 pathspec = false
 pillow = false
@@ -552,6 +571,7 @@ pvporcupine = false
 pyasn1 = false
 pydantic = false
 pyjwt = false
+pynacl = false
 pytest = false
 pytest-asyncio = false
 python-dotenv = false
@@ -576,6 +596,7 @@ sounddevice = false
 starlette = false
 supermemory = false
 tenacity = false
+twine = false
 ty = false
 tzdata = false
 unpaddedbase64 = false
