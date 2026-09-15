@@ -147,14 +147,18 @@ dependencies = [
   # install rather than gating it behind an extra + a mid-session lazy install
   # (which deadlocked the CLI under prompt_toolkit — see #40490).
   "Pillow==12.3.0",
-  # HEIF/HEIC/AVIF decode for the vision tools. iPhone photos and screenshots
-  # are HEIC (frequently mislabeled .jpg by upload pipelines); Pillow has no
-  # built-in HEIF codec, so without this the vision resolver rejects them as
-  # "not a recognized image". pillow-heif registers a Pillow opener so
-  # _normalize_to_supported_image can re-encode HEIF/AVIF to PNG before embed.
-  # Ships prebuilt wheels bundling libheif for the common platforms (no system
-  # libs needed), so it's safe in the base install alongside Pillow.
-  "pillow-heif>=1.4.0,<2",
+  # HEIF/HEIC/AVIF decode for the vision tools is deliberately NOT declared:
+  # upstream ships "pillow-heif>=1.4.0,<2" as a core dependency on the claim
+  # that "prebuilt wheels bundling libheif for the common platforms" cover every
+  # target, but there is no armv7/armv6 wheel — pip then falls back to a source
+  # build needing libheif headers and fails outright, which makes every profile
+  # (minimal included) uninstallable on a Raspberry Pi 2. A lazy entry would only
+  # move that failure to first use, and the Pi2 install guard rejects it in both
+  # places for the same reason. The vision path already treats pillow-heif as a
+  # soft dependency: it registers the opener when importable and otherwise raises
+  # an actionable "install pillow-heif" error, so the agent installs everywhere
+  # and HEIC/AVIF support is a deliberate `pip install pillow-heif` on hosts
+  # whose platform actually publishes a wheel.
   # Windows log rotation. Stdlib ``RotatingFileHandler.doRollover()`` uses
   # ``os.rename()`` which fails with ``PermissionError [WinError 32]`` on
   # Windows whenever any other process holds an append-mode handle on

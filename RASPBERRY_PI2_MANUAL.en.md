@@ -563,6 +563,21 @@ printenv MQTT_HOST
 hermes tools list
 ```
 
+HEIC/HEIF (iPhone photos) not working:
+
+`pillow-heif` is an **optional** dependency: there is no prebuilt armv7/armv6 wheel,
+so the `minimal`/`iot` profiles do not install it (declaring it makes the whole
+install fail on those targets). Install it yourself when you need those formats:
+
+```bash
+python -m pip install pillow-heif
+python -c 'import pillow_heif; print("pillow-heif ok")'
+```
+
+Without it the vision path returns an actionable error naming `pillow-heif`
+rather than failing obscurely; AVIF is native in Pillow >= 11.3 and unaffected.
+
+
 When the model context is rejected, confirm the two values match:
 
 ```yaml
