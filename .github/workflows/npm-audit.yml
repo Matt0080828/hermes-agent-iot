@@ -15,6 +15,13 @@ name: npm audit
 on:
   schedule:
     - cron: '37 7 * * 1'
+  # The audit itself is scheduled-only, but `workflow_dispatch` cannot target a
+  # workflow that does not exist on the default branch yet — so a change to this
+  # file also runs it in its own PR, which is the only way to prove the job
+  # actually executes before it is merged.
+  pull_request:
+    paths:
+      - '.github/workflows/npm-audit.yml'
   workflow_dispatch:
 
 permissions:
