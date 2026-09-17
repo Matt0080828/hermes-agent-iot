@@ -41,17 +41,29 @@ jobs:
           set -uo pipefail
 
           # Find the latest CI run for this PR's head SHA.
-          RUN_INFO=$(gh run list \
-            --repo "$REPO" \
-            --commit "$HEAD_SHA" \
-            --workflow ci.yaml \
-            --limit 1 \
-            --json databaseId,status \
-            --jq '.[0] | "\(.databaseId) \(.status)"' 2>/dev/null || true)
+          # The CI workflow's file is ``ci.yml``; asking for ``ci.yaml`` matched
+          # nothing, so this job reported "no CI run" and exited 0 — the review
+          # label gate was therefore never re-evaluated after the label was added.
+          # Look the run up by file name first, then by workflow name, and fail
+          # loudly if both miss so a silent no-op cannot happen again.
+          RUN_INFO=""
+          for WF in ci.yml CI; do
+            RUN_INFO=$(gh run list \
+              --repo "$REPO" \
+              --commit "$HEAD_SHA" \
+              --workflow "$WF" \
+              --limit 1 \
+              --json databaseId,status \
+              --jq '.[0] | "\(.databaseId) \(.status)"' 2>/dev/null || true)
+            if [ -n "$RUN_INFO" ] && [ "$RUN_INFO" != "null null" ]; then
+              echo "Found CI run via workflow '$WF': $RUN_INFO"
+              break
+            fi
+          done
 
-          if [ -z "$RUN_INFO" ]; then
-            echo "No CI run found for this PR — nothing to rerun."
-            exit 0
+          if [ -z "$RUN_INFO" ] || [ "$RUN_INFO" = "null null" ]; then
+            echo "::error::No CI run found for $HEAD_SHA — cannot rerun failed jobs."
+            exit 1
           fi
 
           # Split "RUN_ID STATUS" into two vars. Read STATUS from RUN_INFO,
