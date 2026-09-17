@@ -14,6 +14,8 @@ def run(*args):
         [sys.executable, str(SCRIPT), *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=180,
     )
 
@@ -43,7 +45,7 @@ def test_quick_run_emits_valid_json_with_measurements(tmp_path):
     assert data["imports"][0]["import_s"] >= 0
     assert data["cli"][0]["exit_code"] == 0
     assert data["cli"][0]["wall_s"] >= 0
-    assert json.loads(out.read_text()) == data
+    assert json.loads(out.read_text(encoding="utf-8")) == data
 
 
 def test_summary_mode_prints_human_readable_output(tmp_path):

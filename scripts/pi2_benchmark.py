@@ -96,7 +96,10 @@ def import_cost(module: str) -> dict:
     """Import `module` in a fresh interpreter and report its own cost."""
     code = CHILD_REPORT.replace("{mod}", module)
     t0 = time.perf_counter()
-    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    proc = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
     wall = time.perf_counter() - t0
     if proc.returncode != 0:
         return {"module": module, "error": (proc.stderr or "").strip().splitlines()[-1:] or ["failed"]}
@@ -132,7 +135,7 @@ def run_cli(argv: list, timeout_s: int = 300) -> dict:
     try:
         proc = subprocess.run(
             [sys.executable, "-c", CLI_WRAPPER, *argv],
-            capture_output=True, text=True, timeout=timeout_s,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_s,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return {"argv": argv, "error": str(exc)}

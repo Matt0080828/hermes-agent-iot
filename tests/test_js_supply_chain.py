@@ -13,6 +13,8 @@ def run(repo, *args):
         [sys.executable, str(SCRIPT), "--repo", str(repo), *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
 
@@ -72,7 +74,9 @@ def test_update_records_the_baseline_and_then_passes(tmp_path):
     )
     assert run(repo).returncode == 1
     assert run(repo, "--update").returncode == 0
-    baseline = json.loads((repo / "scripts" / "js-supply-chain-baseline.json").read_text())
+    baseline = json.loads(
+        (repo / "scripts" / "js-supply-chain-baseline.json").read_text(encoding="utf-8")
+    )
     assert baseline["pinned_exceptions"] == ["pkg/package.json#dependencies#left-pad"]
     assert baseline["lifecycle"] == ["evil@9.9.9"]
     assert run(repo).returncode == 0
@@ -101,9 +105,9 @@ def test_lifecycle_entries_are_matched_by_name_and_version_across_lockfiles(tmp_
         {"lockfileVersion": 3, "packages": {"node_modules/fsevents": {"version": "2.3.3", "hasInstallScript": True}}},
     )
     assert run(repo, "--lifecycle", "--update").returncode == 0
-    json.dump(
+    write_json(
+        repo / "package-lock.json",
         {"lockfileVersion": 3, "packages": {"node_modules/fsevents": {"version": "2.3.3", "hasInstallScript": True}}},
-        open(repo / "package-lock.json", "w"),
     )
     (repo / "web" / "package-lock.json").unlink()
     proc = run(repo, "--lifecycle")
