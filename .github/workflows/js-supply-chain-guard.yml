@@ -1,0 +1,42 @@
+name: JS supply-chain guard
+
+# Keeps two properties of the JS/TS dependency surface true:
+#   1. every external specifier in every package.json is an exact pin
+#      (ranges hide unreviewed code inside a lockfile refresh);
+#   2. no lockfile gains a package with an install/build lifecycle script
+#      without a deliberate baseline update (install scripts run arbitrary code
+#      during `npm ci`).
+# Both are ratcheted against scripts/js-supply-chain-baseline.json, so adopting
+# them does not require a flag day. Borrowed from earendil-works/pi's
+# `check:pinned-deps` and its shrinkwrap lifecycle-script allowlist.
+
+on:
+  pull_request:
+    branches: [main, pi2-lite]
+  push:
+    branches: [main, pi2-lite, "sync/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: js-supply-chain-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: JS pins + lifecycle scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Check dependency pins and lifecycle scripts
+        run: python scripts/check_js_supply_chain.py --repo .

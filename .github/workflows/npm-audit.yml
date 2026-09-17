@@ -1,0 +1,55 @@
+name: npm audit
+
+# Scheduled supply-chain check for the JS/TS dependency surface.
+#
+# The OSV scanner covers *known vulnerabilities* in the lockfiles; this workflow
+# covers the other half: that every installed production package is a
+# registry-signed artifact we can attribute (`npm audit signatures`, the
+# provenance/signature verification earendil-works/pi runs in its own
+# npm-audit.yml). Neither check needs PR context, so it runs on a schedule and
+# on demand rather than in the PR path.
+#
+# Install uses --ignore-scripts: no dependency lifecycle script should run on a
+# runner whose only job is to inspect the tree.
+
+on:
+  schedule:
+    - cron: '37 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: npm audit + registry signatures
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Grab npm 12
+        run: |
+          # Matches the JS lane: the lockfile is generated with npm 12, and the
+          # bundled npm major changes resolution behaviour.
+          npm --version | grep -q '^12\.' || npm i -g npm@12
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Audit production vulnerabilities
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: Verify registry signatures
+        run: npm audit signatures --omit=dev

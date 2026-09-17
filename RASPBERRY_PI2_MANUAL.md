@@ -553,7 +553,23 @@ git log --oneline HEAD..upstream/main
 pytest -q tests/test_mqtt_tool.py tests/test_pi2_install_guards.py
 uv lock --check
 ruff check tools/mqtt_tool.py agent/agent_init.py agent/conversation_loop.py
+python scripts/check_js_supply_chain.py --repo .        # JS 相依：精確釘版 + lifecycle script 閘門
 ```
+
+足跡量測（建議每次 release 或同步後在**實體 Pi2** 上跑一次；純 stdlib，可直接用 `minimal`
+profile 的 venv 執行）：
+
+```bash
+python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out /tmp/pi2-bench.json
+python scripts/pi2_benchmark.py --compare /tmp/pi2-bench.json   # 與上次的 JSON 比較
+python scripts/pi2_benchmark.py --max-rss-kb 180000             # 超過門檻即 exit 1
+# 選用：對本機 llama-server 量單輪延遲
+python scripts/pi2_benchmark.py --base-url http://127.0.0.1:8080/v1 --model <模型 id> --turns 3
+```
+
+輸出包含：各模組的 import 耗時與**各自**的峰值 RSS、指定 CLI 指令的耗時與峰值 RSS（以乾淨的
+wrapper 子程序量測，避免取到其他程序的高水位）、以及選用的每輪 tok/s。把 JSON 存下來就能做
+記憶體／延遲的回歸比較。
 
 ## 10. 故障排除
 
