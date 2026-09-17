@@ -544,7 +544,23 @@ After every upstream sync, run at least:
 pytest -q tests/test_mqtt_tool.py tests/test_pi2_install_guards.py
 uv lock --check
 ruff check tools/mqtt_tool.py agent/agent_init.py agent/conversation_loop.py
+python scripts/check_js_supply_chain.py --repo .        # JS deps: exact pins + lifecycle-script gate
 ```
+
+Footprint benchmark — run it once on the **physical Pi2** per release or sync. Stdlib only, so it
+runs inside the `minimal` profile venv as-is:
+
+```bash
+python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out /tmp/pi2-bench.json
+python scripts/pi2_benchmark.py --compare /tmp/pi2-bench.json   # diff against the previous run
+python scripts/pi2_benchmark.py --max-rss-kb 180000             # exit 1 above the budget
+# optional: per-turn latency against a local llama-server
+python scripts/pi2_benchmark.py --base-url http://127.0.0.1:8080/v1 --model <id> --turns 3
+```
+
+It reports each module's import cost with **its own** peak RSS, the wall time and peak RSS of the
+given CLI command(s) (measured through a fresh wrapper process so no other command's high-water mark
+leaks in), and optional completion tokens/s. Keep the JSON to compare runs later.
 
 ## 10. Troubleshooting
 
