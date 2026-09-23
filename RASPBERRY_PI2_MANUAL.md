@@ -140,7 +140,7 @@ Pi2（armv7/armv6）不能用 uvloop 與 pillow-heif：前者沒有 armv7 wheel�
 
 ```bash
 scripts/regen_pi2_locks.sh                 # 覆寫 requirements/pi2/*.lock
-scripts/regen_pi2_locks.sh /tmp/pi2-check  # 先輸出到暫存目錄檢查
+scripts/regen_pi2_locks.sh ~/pi2-locks-check  # 先輸出到暫存目錄檢查
 ```
 
 腳本對每個 profile 執行 `uv export --format requirements-txt --no-header --no-emit-project --extra <profile> --no-emit-package uvloop`，結束前會再檢查沒有被排除的套件漏進鎖檔。`scripts/check_pi2_install_guards.py` 雙向強制這項政策：`all`／`full` 必須保留 uvloop，而 `minimal`／`iot`／`rag`／`termux*` 與 `requirements/pi2/*.lock` 不得出現 uvloop。
@@ -575,8 +575,8 @@ python scripts/check_js_supply_chain.py --repo .        # JS 相依：精確釘�
 profile 的 venv 執行）：
 
 ```bash
-python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out /tmp/pi2-bench.json
-python scripts/pi2_benchmark.py --compare /tmp/pi2-bench.json   # 與上次的 JSON 比較
+python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out ~/pi2-bench.json
+python scripts/pi2_benchmark.py --compare ~/pi2-bench.json   # 與上次的 JSON 比較
 python scripts/pi2_benchmark.py --max-rss-kb 180000             # 超過門檻即 exit 1
 # 選用：對本機 llama-server 量單輪延遲
 python scripts/pi2_benchmark.py --base-url http://127.0.0.1:8080/v1 --model <模型 id> --turns 3

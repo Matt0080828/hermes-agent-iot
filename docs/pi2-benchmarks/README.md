@@ -53,12 +53,12 @@ python3 -m venv ~/hermes-iot-bench
 ~/hermes-iot-bench/bin/pip install "hermes-agent-iot[minimal]==<version>"
 export HERMES_HOME=~/hermes-bench-home          # keep the run off your real config
 ~/hermes-iot-bench/bin/hermes-iot setup --profile minimal
-scp scripts/pi2_benchmark.py pi2@<host>:/tmp/
-~/hermes-iot-bench/bin/python /tmp/pi2_benchmark.py \
+scp scripts/pi2_benchmark.py pi2@<host>:~/
+~/hermes-iot-bench/bin/python ~/pi2_benchmark.py \
   --label "pi2-<version>-minimal" \
   --cli-cmd "$HOME/hermes-iot-bench/bin/hermes-iot profile show" \
   --cli-cmd "$HOME/hermes-iot-bench/bin/hermes --version" \
-  --out /tmp/pi2-bench-<version>.json
+  --out ~/pi2-bench-<version>.json
 ```
 
 Without `HERMES_HOME` + `setup` the CLI records exit 1 (no profile configured) —
@@ -68,7 +68,7 @@ the benchmark records exit codes rather than hiding them, so check them.
 
 ```sh
 python3 scripts/pi2_benchmark.py --compare docs/pi2-benchmarks/pi2-bench-0.21.3.post1.json \
-  --label "pi2-<new version>-minimal" --out /tmp/pi2-bench-<new version>.json
+  --label "pi2-<new version>-minimal" --out ~/pi2-bench-<new version>.json
 ```
 
 `--compare` prints per-metric deltas. `--max-rss-kb` turns a peak-RSS ceiling

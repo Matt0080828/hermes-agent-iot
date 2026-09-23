@@ -131,7 +131,7 @@ Regenerate the locks (from the repo root, on a machine with `uv` installed):
 
 ```bash
 scripts/regen_pi2_locks.sh                 # rewrite requirements/pi2/*.lock
-scripts/regen_pi2_locks.sh /tmp/pi2-check  # verify into a scratch dir first
+scripts/regen_pi2_locks.sh ~/pi2-locks-check  # verify into a scratch dir first
 ```
 
 The script runs `uv export --format requirements-txt --no-header --no-emit-project --extra <profile> --no-emit-package uvloop` per profile and re-checks that no excluded package leaked in. `scripts/check_pi2_install_guards.py` enforces the policy in both directions: `all`/`full` must keep uvloop, and `minimal`/`iot`/`rag`/`termux*` plus every `requirements/pi2/*.lock` must never contain it.
@@ -566,8 +566,8 @@ Footprint benchmark — run it once on the **physical Pi2** per release or sync.
 runs inside the `minimal` profile venv as-is:
 
 ```bash
-python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out /tmp/pi2-bench.json
-python scripts/pi2_benchmark.py --compare /tmp/pi2-bench.json   # diff against the previous run
+python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out ~/pi2-bench.json
+python scripts/pi2_benchmark.py --compare ~/pi2-bench.json   # diff against the previous run
 python scripts/pi2_benchmark.py --max-rss-kb 180000             # exit 1 above the budget
 # optional: per-turn latency against a local llama-server
 python scripts/pi2_benchmark.py --base-url http://127.0.0.1:8080/v1 --model <id> --turns 3
