@@ -98,12 +98,6 @@ def _setup_update_mocks(monkeypatch, tmp_path):
     monkeypatch.setattr(hermes_config, "migrate_config", lambda **kw: {"env_added": [], "config_added": []})
     monkeypatch.setattr(hermes_main, "_upgrade_pip_before_lazy_refresh", lambda *a, **kw: None)
     monkeypatch.setattr(hermes_main, "_refresh_active_lazy_features", lambda *a, **kw: True)
-    # The real post-pull purge intentionally reloads hermes_cli.main.  In this
-    # mocked update flow that would discard the branch/gateway monkeypatches
-    # while no code was actually pulled, making the test hit the live machine.
-    monkeypatch.setattr(
-        hermes_main, "_purge_stale_hermes_modules", lambda *a, **kw: None
-    )
 
 
 
