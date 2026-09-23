@@ -15,15 +15,13 @@ def _append_warning(result: ModelSwitchResult, text: str) -> None:
         result.warning_message = text
 
 
-def _threshold_tokens(
-    context_length: int,
-    threshold_percent: float,
-    minimum_context_length: int = MINIMUM_CONTEXT_LENGTH,
-) -> int:
-    threshold = max(int(context_length * threshold_percent), minimum_context_length)
-    if threshold >= context_length:
-        return int(context_length * 0.85)
-    return threshold
+def _threshold_tokens(compressor: Any, model: str, context_length: int, provider: str = "") -> int:
+    """The trigger the compressor WILL use after the switch (cap, model_thresholds and small-window
+    floor included), so the warning quotes the real number; duck-typed engines keep the plain ratio."""
+    preview = getattr(compressor, "preview_threshold_tokens", None)
+    if callable(preview):
+        return int(preview(model, context_length, provider))
+    return max(int(context_length * float(getattr(compressor, "threshold_percent", 0.5))), MINIMUM_CONTEXT_LENGTH)
 
 
 def _estimate_tokens(agent: Any, messages: Optional[List[dict]]) -> Optional[int]:
@@ -101,12 +99,7 @@ def merge_preflight_compression_warning(
     if estimate is None:
         return
 
-    from agent.model_metadata import get_minimum_tool_context_length
-
-    new_threshold = _threshold_tokens(
-        new_ctx,
-        float(getattr(cc, "threshold_percent", 0.5)),
-        get_minimum_tool_context_length(agent))
+    new_threshold = _threshold_tokens(cc, result.new_model, new_ctx, result.target_provider)
     if estimate < new_threshold:
         return
 
