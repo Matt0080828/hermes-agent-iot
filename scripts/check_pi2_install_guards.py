@@ -37,6 +37,11 @@ UVLOOP_EXTRA = "uvloop"
 UVLOOP_OPT_IN_PROFILES = ("all", "full")
 UVLOOP_FREE_PROFILES = ("minimal", "iot", "rag", "termux", "termux-all")
 
+# Packages the hashed Pi2 locks (requirements/pi2/*.lock) must never list: they are
+# consumed by `pip install --require-hashes` on armv7/armv6, where these have no wheel.
+# Keep in sync with EXCLUDED_PACKAGES in scripts/regen_pi2_locks.sh.
+PI2_UNINSTALLABLE_PACKAGES = ("uvloop", "pillow-heif")
+
 
 class FailureCollector:
     def __init__(self) -> None:
@@ -142,6 +147,27 @@ def check_uvloop_profile_policy(repo: Path, failures: FailureCollector) -> None:
                 f"pyproject.toml profile {profile!r} should install uvloop through the "
                 f"{UVLOOP_EXTRA!r} extra; add hermes-agent-iot[{UVLOOP_EXTRA}] back or record why not"
             )
+
+
+def check_pi2_locks(repo: Path, failures: FailureCollector) -> None:
+    """Hashed Pi2 locks must only list packages an armv7/armv6 host can install."""
+    locks_dir = repo / "requirements" / "pi2"
+    if not locks_dir.is_dir():
+        return
+    locks = sorted(locks_dir.glob("*.lock"))
+    if not locks:
+        failures.add(
+            "requirements/pi2 holds no *.lock files; setup-pi2-minimal.sh would have nothing to install"
+        )
+        return
+    for lock in locks:
+        for number, line in enumerate(lock.read_text(encoding="utf-8").splitlines(), 1):
+            match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s\\]+)", line)
+            if match and match.group(1).lower() in PI2_UNINSTALLABLE_PACKAGES:
+                failures.add(
+                    f"{lock.relative_to(repo)}:{number} lists {match.group(1)!r}, which Pi2 "
+                    "profiles must not install; regenerate with scripts/regen_pi2_locks.sh"
+                )
 
 
 def iter_python_string_literals(path: Path) -> Iterable[str]:
@@ -311,6 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     failures = FailureCollector()
     check_pyproject(repo, failures)
     check_uvloop_profile_policy(repo, failures)
+    check_pi2_locks(repo, failures)
     check_lazy_deps(repo, failures)
     check_setup_pi2(repo, failures)
     check_setup_pi2_minimal(repo, failures)

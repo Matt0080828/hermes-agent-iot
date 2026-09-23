@@ -114,12 +114,27 @@ bash setup-pi2-minimal.sh --profile rag
 
 The installer:
 
-- Validates Python 3.11–3.13
-- Creates `~/.hermes-venv`
-- Uses `pyproject.toml` as the single dependency source via `pip install -e '.[extras]'`
+- Validates Python 3.11–3.13 and re-checks an existing `~/.hermes-venv` with `lstat`, `os.path.lexists`, and permission-bit checks (rejecting group/world-writable components)
+- Installs the locked dependencies first with `pip install --require-hashes -r requirements/pi2/<profile>.lock`
+- Then installs the project itself with `pip install --no-deps -e ".[extras]"`, so `pyproject.toml` stays the single dependency source and nothing is re-resolved
 - Does not install a separate unpinned package list
 - Does not preinstall torch, Chroma, or a local embedding stack on the Pi2
 - Creates `~/.hermes/config.yaml` only when no config exists yet
+
+### Pi2 profile dependency locks
+
+`requirements/pi2/<profile>.lock` is the only dependency source `setup-pi2-minimal.sh` trusts (installed with `pip install --require-hashes`), exported from `uv.lock`.
+
+Pi2 (armv7/armv6) cannot use uvloop or pillow-heif: uvloop has no armv7 wheel and libuv does not build on Termux, and pillow-heif needs libheif headers. The `minimal`/`iot`/`rag` profile extras never include uvloop; `all`/`full` opt into it deliberately on desktop/server hosts (upstream's `[uvloop]` extra), so the Pi2 locks must exclude it so one `pyproject.toml` installs on both kinds of host.
+
+Regenerate the locks (from the repo root, on a machine with `uv` installed):
+
+```bash
+scripts/regen_pi2_locks.sh                 # rewrite requirements/pi2/*.lock
+scripts/regen_pi2_locks.sh /tmp/pi2-check  # verify into a scratch dir first
+```
+
+The script runs `uv export --format requirements-txt --no-header --no-emit-project --extra <profile> --no-emit-package uvloop` per profile and re-checks that no excluded package leaked in. `scripts/check_pi2_install_guards.py` enforces the policy in both directions: `all`/`full` must keep uvloop, and `minimal`/`iot`/`rag`/`termux*` plus every `requirements/pi2/*.lock` must never contain it.
 
 Startup:
 

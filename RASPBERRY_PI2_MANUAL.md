@@ -123,12 +123,27 @@ bash setup-pi2-minimal.sh --profile rag
 
 安裝器：
 
-- 驗證 Python 3.11–3.13
-- 建立 `~/.hermes-venv`
-- 以 `pip install -e '.[extras]'` 使用 `pyproject.toml` 作為唯一依賴來源
+- 驗證 Python 3.11–3.13，並以 `lstat`／`os.path.lexists`／權限位檢查既有 `~/.hermes-venv`（拒絕 group／world-writable）
+- 先以 `pip install --require-hashes -r requirements/pi2/<profile>.lock` 安裝鎖定的依賴
+- 再以 `pip install --no-deps -e ".[extras]"` 依本 repo 的 `pyproject.toml` 安裝本體，不重新解析依賴
 - 不另外安裝未鎖定的套件清單
 - 不在 Pi2 預裝 torch、Chroma 或本機 embedding stack
 - 只在尚無設定時建立 `~/.hermes/config.yaml`
+
+### Pi2 profile 依賴鎖檔
+
+`requirements/pi2/<profile>.lock` 是 `setup-pi2-minimal.sh` 唯一信任的依賴來源（以 `pip install --require-hashes` 安裝），由 `uv.lock` 匯出。
+
+Pi2（armv7/armv6）不能用 uvloop 與 pillow-heif：前者沒有 armv7 wheel、libuv 也無法在 Termux 編譯；後者需要 libheif headers。`minimal`／`iot`／`rag` 三個 profile 的 extra 本身就不含 uvloop；`all`／`full` 在桌面／伺服器主機上是刻意 opt-in（上游的 `[uvloop]` extra），所以匯出 Pi2 鎖檔時必須排除，讓同一份 `pyproject.toml` 在兩種宿主都能安裝。
+
+重新產生鎖檔（在 repo 根目錄、已安裝 `uv` 的機器上執行）：
+
+```bash
+scripts/regen_pi2_locks.sh                 # 覆寫 requirements/pi2/*.lock
+scripts/regen_pi2_locks.sh /tmp/pi2-check  # 先輸出到暫存目錄檢查
+```
+
+腳本對每個 profile 執行 `uv export --format requirements-txt --no-header --no-emit-project --extra <profile> --no-emit-package uvloop`，結束前會再檢查沒有被排除的套件漏進鎖檔。`scripts/check_pi2_install_guards.py` 雙向強制這項政策：`all`／`full` 必須保留 uvloop，而 `minimal`／`iot`／`rag`／`termux*` 與 `requirements/pi2/*.lock` 不得出現 uvloop。
 
 啟動：
 
