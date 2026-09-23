@@ -57,6 +57,7 @@
     "@xmldom/xmldom@^0.9": "0.9.12",
     "baseline-browser-mapping": "2.11.0",
     "browserslist@^4": "4.28.7",
+    "rolldown@^1": "1.2.1",
     "colord@^2": "2.9.4",
     "fast-uri@^3": "3.1.6",
     "joi@^18": "18.2.5",
