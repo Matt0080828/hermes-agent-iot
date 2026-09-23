@@ -27,6 +27,16 @@ BANNED_DEFAULT_DEPS = (
     "pillow-heif",
 )
 
+# uvloop is the one banned package that stays reachable on purpose: upstream gates it
+# behind its own [uvloop] extra, and the fork's all/full profiles pull that extra in so
+# desktop/server hosts get the faster loop. Pi2 and Termux profiles must never reach it —
+# there is no armv7 wheel, and libuv does not build on Termux. The two tuples below are
+# asserted in both directions so a future upstream sync cannot silently widen or narrow
+# the policy.
+UVLOOP_EXTRA = "uvloop"
+UVLOOP_OPT_IN_PROFILES = ("all", "full")
+UVLOOP_FREE_PROFILES = ("minimal", "iot", "rag", "termux", "termux-all")
+
 
 class FailureCollector:
     def __init__(self) -> None:
@@ -74,9 +84,63 @@ def check_pyproject(repo: Path, failures: FailureCollector) -> None:
     for section, dep in iter_pyproject_deps(pyproject):
         package = normalize_dep(dep)
         if package in BANNED_DEFAULT_DEPS:
+            if package == "uvloop" and section == f"project.optional-dependencies.{UVLOOP_EXTRA}":
+                # The opt-in extra is the only sanctioned home for uvloop; who may reach
+                # it is enforced by check_uvloop_profile_policy().
+                continue
             failures.add(
                 f"pyproject.toml {section} contains Pi2-hostile dependency {dep!r}; "
                 "use lightweight/remote alternatives by default"
+            )
+
+
+def extra_closure(optional: dict, roots: Iterable[str]) -> set[str]:
+    """Transitive closure of profile extras, following ``hermes-agent-iot[a,b]`` pins."""
+    seen: set[str] = set()
+    stack = list(roots)
+    while stack:
+        extra = stack.pop()
+        if extra in seen:
+            continue
+        seen.add(extra)
+        for dep in optional.get(extra, []) or []:
+            for reference in re.findall(r"hermes-agent(?:-iot)?\[([^\]]+)\]", dep):
+                stack.extend(part.strip() for part in reference.split(",") if part.strip())
+    return seen
+
+
+def check_uvloop_profile_policy(repo: Path, failures: FailureCollector) -> None:
+    """minimal/iot/rag/termux* must stay uvloop-free; all/full must keep it reachable."""
+    pyproject = repo / "pyproject.toml"
+    if not pyproject.exists():
+        return
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    optional = (data.get("project", {}) or {}).get("optional-dependencies", {}) or {}
+
+    def uvloop_via(profile: str) -> str:
+        for extra in extra_closure(optional, [profile]):
+            for dep in optional.get(extra, []) or []:
+                if normalize_dep(dep) == UVLOOP_EXTRA:
+                    return extra
+        return ""
+
+    for profile in UVLOOP_FREE_PROFILES:
+        if profile not in optional:
+            continue
+        via = uvloop_via(profile)
+        if via:
+            failures.add(
+                f"pyproject.toml profile {profile!r} must not install uvloop "
+                f"(reached through extra {via!r}); only {'/'.join(UVLOOP_OPT_IN_PROFILES)} may"
+            )
+
+    for profile in UVLOOP_OPT_IN_PROFILES:
+        if profile not in optional:
+            continue
+        if not uvloop_via(profile):
+            failures.add(
+                f"pyproject.toml profile {profile!r} should install uvloop through the "
+                f"{UVLOOP_EXTRA!r} extra; add hermes-agent-iot[{UVLOOP_EXTRA}] back or record why not"
             )
 
 
@@ -246,6 +310,7 @@ def main(argv: list[str] | None = None) -> int:
     repo = Path(args.repo).resolve()
     failures = FailureCollector()
     check_pyproject(repo, failures)
+    check_uvloop_profile_policy(repo, failures)
     check_lazy_deps(repo, failures)
     check_setup_pi2(repo, failures)
     check_setup_pi2_minimal(repo, failures)

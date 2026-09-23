@@ -349,6 +349,65 @@ class Pi2InstallGuardTests(unittest.TestCase):
                 self.assertEqual(fallback[0]["base_url"], "http://127.0.0.1:8080/v1")
                 self.assertEqual(fallback[0]["api_key"], "local")
 
+    def test_pi2_install_guard_allows_uvloop_through_the_opt_in_extra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            pyproject = repo / "pyproject.toml"
+            pyproject.write_text(
+                pyproject.read_text(encoding="utf-8")
+                + 'uvloop = ["uvloop>=0.15.1,<0.24"]\n'
+                + 'all = ["hermes-agent-iot[uvloop]"]\n'
+                + 'full = ["hermes-agent-iot[all]"]\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Pi2 install guard checks passed", result.stdout)
+
+    def test_pi2_install_guard_rejects_uvloop_in_pi2_profiles(self) -> None:
+        # Direct (minimal) and transitive (iot -> minimal, rag -> iot -> minimal) routes.
+        declared = (
+            'uvloop = ["uvloop>=0.15.1"]\n'
+            'minimal = ["uvloop>=0.15.1"]\n'
+            'iot = ["hermes-agent-iot[minimal]"]\n'
+            'rag = ["hermes-agent-iot[iot]"]\n'
+        )
+        for profile in ("minimal", "iot", "rag"):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                write_minimal_repo(repo)
+                pyproject = repo / "pyproject.toml"
+                pyproject.write_text(
+                    pyproject.read_text(encoding="utf-8") + declared,
+                    encoding="utf-8",
+                )
+
+                result = self.run_guard(repo)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(f"profile '{profile}' must not install uvloop", result.stdout)
+
+    def test_pi2_install_guard_requires_uvloop_on_desktop_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            pyproject = repo / "pyproject.toml"
+            pyproject.write_text(
+                pyproject.read_text(encoding="utf-8")
+                + 'uvloop = ["uvloop>=0.15.1,<0.24"]\n'
+                + 'all = ["hermes-agent-iot[cron]"]\n'
+                + 'full = ["hermes-agent-iot[all]"]\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("should install uvloop", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
