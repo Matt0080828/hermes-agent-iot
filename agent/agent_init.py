@@ -1998,9 +1998,6 @@ def _build_context_engine(agent, _agent_cfg, cs, _custom_providers, _effective_c
 def _enforce_minimum_context(agent):
     # Reject windows below the configured tool-workflow floor (default 64K); an explicit
     # positive model.context_length on LM Studio is allowed below the floor.
-    from agent.model_metadata import get_minimum_tool_context_length
-
-    minimum_context_length = get_minimum_tool_context_length(agent)
     _ctx = getattr(agent.context_compressor, "context_length", 0)
     # A local Ollama server serves num_ctx, not the GGUF's advertised window: a Modelfile or
     # model.ollama_num_ctx at 64K+ is a usable window even when the metadata says 40K (#100437).
@@ -2013,30 +2010,16 @@ def _enforce_minimum_context(agent):
         and not isinstance(agent._config_context_length, bool)
         and agent._config_context_length > 0
     )
-    if _ctx and _ctx < minimum_context_length and not _allow_lmstudio_explicit_below_floor:
-        floor_k = minimum_context_length // 1000
-        if agent.base_url and is_local_endpoint(agent.base_url):
-            # Any OpenAI-compatible local server (llama.cpp, vLLM, Ollama, ...) — the window is the
-            # server's runtime setting, not the model's; never assume Ollama here (#87075).
-            remedy = (
-                f"Your local server is serving a {_ctx:,}-token window.  Start it with at least "
-                f"{floor_k}K context (llama.cpp: -c {minimum_context_length}; vLLM: --max-model-len; "
-                f"Ollama: OLLAMA_CONTEXT_LENGTH={minimum_context_length} or a Modelfile num_ctx), "
-                f"or set model.ollama_num_ctx in config.yaml to the window it really serves "
-                f"(at least {floor_k}K)."
-            )
-        else:
-            remedy = (
-                f"Choose a model with at least {floor_k}K context.  If your server "
-                f"reports a window smaller than the model's true window, set "
-                f"model.context_length in config.yaml to the real value "
-                f"(this must be at least {floor_k}K)."
-            )
-        raise ValueError(
-            f"Model {agent.model} has a context window of {_ctx:,} tokens, "
-            f"which is below the minimum {minimum_context_length:,} required "
-            f"by Hermes Agent.  {remedy}"
-        )
+    if _allow_lmstudio_explicit_below_floor:
+        return
+    from agent.model_metadata import get_minimum_tool_context_length, validate_tool_context_length
+
+    # Delegate to the shared validator so the rejection message always names the
+    # *configured* floor (agent.minimum_tool_context_length, e.g. the Pi2 profiles'
+    # lowered floor) instead of the 64K default.
+    validate_tool_context_length(
+        agent.model, _ctx, get_minimum_tool_context_length(agent),
+    )
 
 
 def _warn_nonagentic_hermes_model(agent):
