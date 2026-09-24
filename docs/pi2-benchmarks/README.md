@@ -10,9 +10,54 @@ here is estimated or extrapolated.
 | Baseline | Version measured | Profile | Install source |
 | --- | --- | --- | --- |
 | `pi2-bench-0.21.3.post1.json` | `hermes-agent-iot 0.21.3.post1` | `minimal` | public PyPI (`pip install 'hermes-agent-iot[minimal]==0.21.3.post1'`) |
+| `pi2-bench-0.21.4.post1.json` | `hermes-agent-iot 0.21.4.post1` | `minimal` | public PyPI wheel, `pip download` + SHA-256 checked on the device |
+| `pi2-bench-0.21.4.post1-run2.json` | same release, same venv, run repeated ~30 s later | `minimal` | second sample — the run-to-run noise floor used below |
 
 Hardware/OS for all files: Raspberry Pi 2 Model B (`armv7l`, ARMv7 rev 5),
 Raspbian trixie, CPython 3.13.5, 921 MiB RAM, 921 MiB swap, SD card.
+
+Committed copies are the raw run JSON with `/home/pi2` collapsed to `~` (the same
+treatment as the older files); nothing else is edited. Raw on-device digests for
+the 0.21.4.post1 pair: run 1
+`61431fac42583323e18a471762a01c2d4cce35e5e94233506c80c3d42559fd99`, run 2
+`59dcfe901e55e9abda63bacf1a17f076d854effb25fdbd801d15997d82a3f796`.
+
+## What the numbers say (0.21.4.post1)
+
+Cold-start import cost, fresh interpreter per module (`peak_rss_kb` is that
+interpreter's high-water mark), against the archived 0.21.3.post1 baseline:
+
+| Module | import | peak RSS | vs 0.21.3.post1 |
+| --- | --- | --- | --- |
+| `hermes_cli.iot_cli` | 0.70 s | 16.9 MiB | +0.01 s (+2 %) — noise |
+| `agent.agent_init` | **4.79 s** | **34.3 MiB** | **+0.92 s (+24 %), +5,704 KiB (+19.4 %)** |
+| `tools.registry` | 0.32 s | 16.9 MiB | −0.01 s (−3 %) — noise |
+
+Console entry points, measured by wrapping each command in a clean parent
+process:
+
+| Command | wall | peak RSS | exit | vs 0.21.3.post1 |
+| --- | --- | --- | --- | --- |
+| `hermes-iot profile show` | 1.06 s | 13.2 MiB | 0 | −0.20 s (faster) |
+| `hermes --version` | 3.38 s | 23.1 MiB | 0 | −0.01 s — flat |
+| `python -c pass` (interpreter floor) | 0.15 s | 9.1 MiB | 0 | flat |
+
+**The only number that moved is `agent.agent_init`**: +0.92 s and +5.7 MiB of
+peak RSS on cold import, ~24 % slower and ~19 % heavier than 0.21.3.post1. It is
+not measurement noise — the repeat run 30 s later
+(`pi2-bench-0.21.4.post1-run2.json`) reproduced it within 0.18 s and 4 KiB, while
+every other record reproduced within 0.02 s / 4 KiB, i.e. the floor on this board
+is ~1 %.
+
+Note what did *not* move: `hermes --version` is flat even though `agent_init` got
+0.92 s heavier, which shows the thin CLI entry points never import `agent_init`.
+The regression lands on paths that do load the agent (agent runs, gateway, TUI),
+not on `--version` or `profile show`.
+
+Environment for both files: 921 MiB RAM (713 MiB available during run 1),
+921 MiB swap (881 MiB free — the 0.21.3.post1 file was captured with only 705 MiB
+free, which is background state, not a release difference), ~5.7 GiB free on
+`$HOME`, loadavg 0.16.
 
 ## What the numbers say (0.21.3.post1)
 
@@ -67,7 +112,7 @@ the benchmark records exit codes rather than hiding them, so check them.
 ## Comparing a new run against a baseline
 
 ```sh
-python3 scripts/pi2_benchmark.py --compare docs/pi2-benchmarks/pi2-bench-0.21.3.post1.json \
+python3 scripts/pi2_benchmark.py --compare docs/pi2-benchmarks/pi2-bench-0.21.4.post1.json \
   --label "pi2-<new version>-minimal" --out ~/pi2-bench-<new version>.json
 ```
 
@@ -76,8 +121,11 @@ into a non-zero exit, which is what a CI lane would gate on.
 
 ## Caveats
 
-- Measurements are single samples on one board. Treat differences below ~10%
-  as noise; re-run and compare medians before calling something a regression.
+- Measurements are single samples on one board, so treat small differences as
+  noise — but the 0.21.4.post1 pair puts the floor tighter than a blanket rule of
+  thumb: two runs 30 s apart reproduced every record within 0.02 s / 4 KiB
+  (~1 %), except `agent.agent_init` itself, which moved 0.18 s. Differences
+  around 1 % are not evidence; re-run before calling something a regression.
 - `disk_free_*` and `loadavg` capture the moment of the run; they are context,
   not benchmarks.
 - Files here are de-sensitised (`/home/<user>` collapsed to `~`). Keep it that
