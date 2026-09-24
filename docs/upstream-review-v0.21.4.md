@@ -3,6 +3,11 @@
 Written for the Pi2/IoT fork sync. Everything below is measured with `git`/`gh` against
 `NousResearch/hermes-agent`, not copied from a summary.
 
+Status: the sync described here shipped as `0.21.4.post1` (tag `iot-v0.21.4.post1`,
+commit `81867ce8668e6fb9c5979380eec73057ba350278`, wheel SHA-256
+`c642f6a20378806f998fbb14017046ada009a0dcdcb8cdf4f49176abb639a6a7`). The table below
+still records the pre-sync baseline it was written against.
+
 ## Scope
 
 | | |

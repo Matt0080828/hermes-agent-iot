@@ -38,7 +38,7 @@ Raspberry Pi OS 若仍是 Python 3.9，必須先安裝 Python 3.11+。
 
 ### 3.1 公開 PyPI wheel（已完成實體 Pi2 驗證）
 
-目前已驗證版本是 `hermes-agent-iot 0.21.3.post1`。它已從公開 PyPI
+目前已驗證版本是 `hermes-agent-iot 0.21.4.post1`。它已從公開 PyPI
 clean-install 到實體 Raspberry Pi 2 Model B Rev 1.1（`armv7l`、32-bit、
 921 MiB RAM、Python 3.13.5），並通過 `minimal` Profile、CLI、`pip check`
 與 console script／import smoke test。
@@ -52,7 +52,7 @@ python3 -m venv ~/.venvs/hermes-iot
 source ~/.venvs/hermes-iot/bin/activate
 
 python -m pip install --upgrade pip
-python -m pip install 'hermes-agent-iot[minimal]==0.21.3.post1'
+python -m pip install 'hermes-agent-iot[minimal]==0.21.4.post1'
 python -m pip check
 
 hermes-iot setup --profile minimal
@@ -70,12 +70,12 @@ distribution 會提供重疊的 Python modules 與 CLI。`hermes-iot setup` 不�
 供應鏈識別：
 
 ```text
-PyPI:       https://pypi.org/project/hermes-agent-iot/0.21.3.post1/
-Tag:        iot-v0.21.3.post1
-Commit:     9aa3e6504edb4b4d6758a9b09c48b77d39c03c51
-Wheel:      hermes_agent_iot-0.21.3.post1-py3-none-any.whl
-SHA-256:    8ad7ce615e4f741a52e882eab2d2e4df3978b22cf24cb90b61db636cddc1e116
-Workflow:   https://github.com/matttest0080-prog/hermes-agent-iot/actions/runs/34971457612
+PyPI:       https://pypi.org/project/hermes-agent-iot/0.21.4.post1/
+Tag:        iot-v0.21.4.post1
+Commit:     81867ce8668e6fb9c5979380eec73057ba350278
+Wheel:      hermes_agent_iot-0.21.4.post1-py3-none-any.whl
+SHA-256:    c642f6a20378806f998fbb14017046ada009a0dcdcb8cdf4f49176abb639a6a7
+Workflow:   https://github.com/matttest0080-prog/hermes-agent-iot/actions/runs/35947841028
 ```
 
 此版本只發布一個 universal wheel，沒有 sdist；公開 PyPI provenance 綁定
@@ -575,7 +575,7 @@ python scripts/check_js_supply_chain.py --repo .        # JS 相依：精確釘�
 profile 的 venv 執行）：
 
 ```bash
-python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out ~/pi2-bench.json
+python scripts/pi2_benchmark.py --label pi2-0.21.4.post1 --out ~/pi2-bench.json
 python scripts/pi2_benchmark.py --compare ~/pi2-bench.json   # 與上次的 JSON 比較
 python scripts/pi2_benchmark.py --max-rss-kb 180000             # 超過門檻即 exit 1
 # 選用：對本機 llama-server 量單輪延遲
