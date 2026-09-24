@@ -1,0 +1,82 @@
+{
+  "cli": [
+    {
+      "argv": [
+        "~/p2-verify-pypi-0.21.4.post1/venv/bin/hermes-iot",
+        "profile",
+        "show"
+      ],
+      "exit_code": 0,
+      "peak_rss_kb": 13508,
+      "peak_rss_source": "rusage-children-of-wrapper",
+      "wall_s": 1.062,
+      "wrapper_overhead_s": 0.333
+    },
+    {
+      "argv": [
+        "~/p2-verify-pypi-0.21.4.post1/venv/bin/hermes",
+        "--version"
+      ],
+      "exit_code": 0,
+      "peak_rss_kb": 23692,
+      "peak_rss_source": "rusage-children-of-wrapper",
+      "wall_s": 3.384,
+      "wrapper_overhead_s": 0.335
+    },
+    {
+      "argv": [
+        "~/p2-verify-pypi-0.21.4.post1/venv/bin/python",
+        "-c",
+        "pass"
+      ],
+      "exit_code": 0,
+      "peak_rss_kb": 9352,
+      "peak_rss_source": "rusage-children-of-wrapper",
+      "wall_s": 0.147,
+      "wrapper_overhead_s": 0.333
+    }
+  ],
+  "environment": {
+    "cpu_model": "ARMv7 Processor rev 5 (v7l)",
+    "disk_free_cwd_kb": 6016996,
+    "disk_free_home_kb": 6016996,
+    "disk_free_tmp_kb": 439672,
+    "hostname": "pi2",
+    "loadavg": [
+      0.1640625,
+      0.1083984375,
+      0.09423828125
+    ],
+    "machine": "armv7l",
+    "mem_available_kb": 729652,
+    "mem_total_kb": 943124,
+    "platform": "Linux-6.12.75+rpt-rpi-v7-armv7l-with-glibc2.41",
+    "python": "3.13.5",
+    "python_impl": "CPython",
+    "swap_free_kb": 902300,
+    "swap_total_kb": 943100
+  },
+  "imports": [
+    {
+      "import_s": 0.696,
+      "module": "hermes_cli.iot_cli",
+      "peak_rss_kb": 17260,
+      "wall_s": 1.067
+    },
+    {
+      "import_s": 4.785,
+      "module": "agent.agent_init",
+      "peak_rss_kb": 35124,
+      "wall_s": 5.497
+    },
+    {
+      "import_s": 0.322,
+      "module": "tools.registry",
+      "peak_rss_kb": 17260,
+      "wall_s": 0.651
+    }
+  ],
+  "label": "pi2-0.21.4.post1",
+  "measured_at": "2026-09-24T12:56:49+0800",
+  "model": []
+}
