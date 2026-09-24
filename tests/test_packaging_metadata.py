@@ -436,8 +436,19 @@ def test_security_pins_present_in_mirrored_lazy_features():
     )
 
 
+_CATALOG_PROJECT_NAME = tomllib.loads(
+    (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+)["project"]["name"].strip().lower()
+# A ``name[extra]`` requirement whose name is the project itself is a self-reference, not a
+# dependency: the IoT fork renames the distribution to ``hermes-agent-iot`` and rewrites every
+# ``hermes-agent[...]`` self-reference accordingly. Resolving against the literal upstream name
+# alone walks an empty closure, which both fails the [all]-keeps-uvloop assertion and silently
+# neuters the Termux uvloop guard, so accept either name.
+_SELF_REFERENCE_NAMES = {_CATALOG_PROJECT_NAME, "hermes-agent"}
+
+
 def _extra_closure(extras: dict, name: str) -> set:
-    """Names of every extra reachable from ``hermes-agent[name]`` self-references."""
+    """Names of every extra reachable from the project's own ``name[extra]`` self-references."""
     seen, todo = set(), [name]
     while todo:
         cur = todo.pop()
@@ -445,7 +456,7 @@ def _extra_closure(extras: dict, name: str) -> set:
             continue
         seen.add(cur)
         for spec in extras.get(cur, ()):
-            if _distribution_name(spec) == "hermes-agent":
+            if _distribution_name(spec) in _SELF_REFERENCE_NAMES:
                 todo.extend(spec.split("[", 1)[1].split("]", 1)[0].split(","))
     return seen
 

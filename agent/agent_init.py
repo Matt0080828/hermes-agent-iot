@@ -2012,13 +2012,38 @@ def _enforce_minimum_context(agent):
     )
     if _allow_lmstudio_explicit_below_floor:
         return
-    from agent.model_metadata import get_minimum_tool_context_length, validate_tool_context_length
+    from agent.model_metadata import get_minimum_tool_context_length
 
-    # Delegate to the shared validator so the rejection message always names the
-    # *configured* floor (agent.minimum_tool_context_length, e.g. the Pi2 profiles'
-    # lowered floor) instead of the 64K default.
-    validate_tool_context_length(
-        agent.model, _ctx, get_minimum_tool_context_length(agent),
+    # The floor is configurable (agent.minimum_tool_context_length; the Pi2 profiles lower it),
+    # so it is never taken from a module constant. The wording stays split by endpoint the way
+    # upstream has it: a local server's window is its own runtime setting, so it gets the
+    # server-side remedy (#87075), while a hosted route gets model advice.
+    minimum_context_length = get_minimum_tool_context_length(agent)
+    if not _ctx or _ctx >= minimum_context_length:
+        return
+    floor_k = minimum_context_length // 1000
+    if agent.base_url and is_local_endpoint(agent.base_url):
+        lead = (
+            f"which is below the configured minimum {minimum_context_length:,} "
+            f"required by Hermes Agent."
+        )
+        remedy = (
+            f"Your local server is serving a {_ctx:,}-token window.  Start it with at least "
+            f"{floor_k}K context (llama.cpp: -c {minimum_context_length}; vLLM: --max-model-len; "
+            f"Ollama: OLLAMA_CONTEXT_LENGTH={minimum_context_length} or a Modelfile num_ctx), "
+            f"or set model.ollama_num_ctx in config.yaml to the window it really serves "
+            f"(at least {floor_k}K)."
+        )
+    else:
+        lead = f"which is below the minimum {minimum_context_length:,} required by Hermes Agent."
+        remedy = (
+            f"Choose a model with at least {floor_k}K context.  If your server "
+            f"reports a window smaller than the model's true window, set "
+            f"model.context_length in config.yaml to the real value "
+            f"(this must be at least {floor_k}K)."
+        )
+    raise ValueError(
+        f"Model {agent.model} has a context window of {_ctx:,} tokens, {lead}  {remedy}"
     )
 
 
