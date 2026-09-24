@@ -38,7 +38,7 @@ If Raspberry Pi OS is still on Python 3.9, install Python 3.11+ first.
 
 ### 3.1 Public PyPI wheel (verified on physical Pi2)
 
-The currently verified version is `hermes-agent-iot 0.21.3.post1`. It has been clean-installed from public PyPI onto a physical Raspberry Pi 2 Model B Rev 1.1 (`armv7l`, 32-bit, 921 MiB RAM, Python 3.13.5), passing the `minimal` profile, CLI, `pip check`, and console-script/import smoke tests.
+The currently verified version is `hermes-agent-iot 0.21.4.post1`. It has been clean-installed from public PyPI onto a physical Raspberry Pi 2 Model B Rev 1.1 (`armv7l`, 32-bit, 921 MiB RAM, Python 3.13.5), passing the `minimal` profile, CLI, `pip check`, and console-script/import smoke tests.
 
 You must use a virtualenv with Python `>=3.11,<3.14`; do not use system pip, `sudo pip`, or `--break-system-packages`:
 
@@ -48,7 +48,7 @@ python3 -m venv ~/.venvs/hermes-iot
 source ~/.venvs/hermes-iot/bin/activate
 
 python -m pip install --upgrade pip
-python -m pip install 'hermes-agent-iot[minimal]==0.21.3.post1'
+python -m pip install 'hermes-agent-iot[minimal]==0.21.4.post1'
 python -m pip check
 
 hermes-iot setup --profile minimal
@@ -64,12 +64,12 @@ Do not install the upstream `hermes-agent` distribution into the same virtualenv
 Supply-chain identifiers:
 
 ```text
-PyPI:       https://pypi.org/project/hermes-agent-iot/0.21.3.post1/
-Tag:        iot-v0.21.3.post1
-Commit:     9aa3e6504edb4b4d6758a9b09c48b77d39c03c51
-Wheel:      hermes_agent_iot-0.21.3.post1-py3-none-any.whl
-SHA-256:    8ad7ce615e4f741a52e882eab2d2e4df3978b22cf24cb90b61db636cddc1e116
-Workflow:   https://github.com/matttest0080-prog/hermes-agent-iot/actions/runs/34971457612
+PyPI:       https://pypi.org/project/hermes-agent-iot/0.21.4.post1/
+Tag:        iot-v0.21.4.post1
+Commit:     81867ce8668e6fb9c5979380eec73057ba350278
+Wheel:      hermes_agent_iot-0.21.4.post1-py3-none-any.whl
+SHA-256:    c642f6a20378806f998fbb14017046ada009a0dcdcb8cdf4f49176abb639a6a7
+Workflow:   https://github.com/matttest0080-prog/hermes-agent-iot/actions/runs/35947841028
 ```
 
 This release publishes a single universal wheel and no sdist; public PyPI provenance is bound to repository `matttest0080-prog/hermes-agent-iot`, workflow `publish-pypi.yml`, and the protected `pypi` Environment.
@@ -566,7 +566,7 @@ Footprint benchmark — run it once on the **physical Pi2** per release or sync.
 runs inside the `minimal` profile venv as-is:
 
 ```bash
-python scripts/pi2_benchmark.py --label pi2-0.21.3.post1 --out ~/pi2-bench.json
+python scripts/pi2_benchmark.py --label pi2-0.21.4.post1 --out ~/pi2-bench.json
 python scripts/pi2_benchmark.py --compare ~/pi2-bench.json   # diff against the previous run
 python scripts/pi2_benchmark.py --max-rss-kb 180000             # exit 1 above the budget
 # optional: per-turn latency against a local llama-server
