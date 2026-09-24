@@ -349,6 +349,119 @@ class Pi2InstallGuardTests(unittest.TestCase):
                 self.assertEqual(fallback[0]["base_url"], "http://127.0.0.1:8080/v1")
                 self.assertEqual(fallback[0]["api_key"], "local")
 
+    def test_pi2_install_guard_allows_uvloop_through_the_opt_in_extra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            pyproject = repo / "pyproject.toml"
+            pyproject.write_text(
+                pyproject.read_text(encoding="utf-8")
+                + 'uvloop = ["uvloop>=0.15.1,<0.24"]\n'
+                + 'all = ["hermes-agent-iot[uvloop]"]\n'
+                + 'full = ["hermes-agent-iot[all]"]\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Pi2 install guard checks passed", result.stdout)
+
+    def test_pi2_install_guard_rejects_uvloop_in_pi2_profiles(self) -> None:
+        # Direct (minimal) and transitive (iot -> minimal, rag -> iot -> minimal) routes.
+        declared = (
+            'uvloop = ["uvloop>=0.15.1"]\n'
+            'minimal = ["uvloop>=0.15.1"]\n'
+            'iot = ["hermes-agent-iot[minimal]"]\n'
+            'rag = ["hermes-agent-iot[iot]"]\n'
+        )
+        for profile in ("minimal", "iot", "rag"):
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as tmp:
+                repo = Path(tmp)
+                write_minimal_repo(repo)
+                pyproject = repo / "pyproject.toml"
+                pyproject.write_text(
+                    pyproject.read_text(encoding="utf-8") + declared,
+                    encoding="utf-8",
+                )
+
+                result = self.run_guard(repo)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(f"profile '{profile}' must not install uvloop", result.stdout)
+
+    def test_pi2_install_guard_requires_uvloop_on_desktop_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            pyproject = repo / "pyproject.toml"
+            pyproject.write_text(
+                pyproject.read_text(encoding="utf-8")
+                + 'uvloop = ["uvloop>=0.15.1,<0.24"]\n'
+                + 'all = ["hermes-agent-iot[cron]"]\n'
+                + 'full = ["hermes-agent-iot[all]"]\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("should install uvloop", result.stdout)
+
+    def test_pi2_install_guard_rejects_uvloop_in_a_pi2_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            locks = repo / "requirements" / "pi2"
+            locks.mkdir(parents=True)
+            (locks / "full.lock").write_text(
+                "aiohttp==3.14.3 \\\n"
+                "    --hash=sha256:03cd2bde3d7f085b64e549c985f4bb928cad7e8ecf5323bfca320db548d81b39\n"
+                "uvloop==0.22.1 ; platform_python_implementation != 'PyPy' \\\n"
+                "    --hash=sha256:deadbeef\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("requirements/pi2/full.lock", result.stdout)
+        self.assertIn("lists 'uvloop'", result.stdout)
+
+    def test_pi2_install_guard_accepts_clean_pi2_locks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            locks = repo / "requirements" / "pi2"
+            locks.mkdir(parents=True)
+            (locks / "minimal.lock").write_text(
+                "aiohttp==3.14.3 \\\n"
+                "    --hash=sha256:03cd2bde3d7f085b64e549c985f4bb928cad7e8ecf5323bfca320db548d81b39\n"
+                "    # via hermes-agent-iot\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_real_pi2_locks_exist_and_exclude_uninstallable_packages(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        locks = repo / "requirements" / "pi2"
+        expected = {"minimal", "iot", "rag", "full", "dev"}
+        present = {path.stem for path in locks.glob("*.lock")}
+        self.assertEqual(expected - present, set(), f"missing Pi2 locks: {sorted(expected - present)}")
+
+        for name in sorted(expected & present):
+            text = (locks / f"{name}.lock").read_text(encoding="utf-8")
+            for package in ("uvloop", "pillow-heif"):
+                with self.subTest(lock=name, package=package):
+                    self.assertNotRegex(
+                        text,
+                        rf"(?m)^{package}==",
+                        f"{name}.lock must not list {package} (no armv7 wheel)",
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

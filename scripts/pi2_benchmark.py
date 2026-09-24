@@ -28,6 +28,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -83,7 +84,7 @@ def environment() -> dict:
         "swap_free_kb": mem.get("SwapFree"),
         "loadavg": list(os.getloadavg()) if hasattr(os, "getloadavg") else None,
     }
-    for label, path in (("home", os.path.expanduser("~")), ("cwd", os.getcwd()), ("tmp", "/tmp")):
+    for label, path in (("home", os.path.expanduser("~")), ("cwd", os.getcwd()), ("tmp", tempfile.gettempdir())):
         try:
             usage = shutil.disk_usage(path)
             env[f"disk_free_{label}_kb"] = usage.free // 1024

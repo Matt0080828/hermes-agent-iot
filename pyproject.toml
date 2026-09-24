@@ -2,7 +2,7 @@
 
 [project]
 name = "hermes-agent-iot"
-version = "0.21.3.post1"
+version = "0.21.4.post1"
 description = "IoT and low-resource packaging of Hermes Agent, maintained as a native-compatible fork"
 readme = "README.md"
 # Upper bound is load-bearing, not cosmetic. uv resolves the project's
@@ -127,7 +127,13 @@ dependencies = [
   "pathspec==1.1.1",
   "fastapi>=0.104.0,<1",
   # CIDR-aware forwarded_allow_ips requires uvicorn >=0.31.0.
+  # uvicorn's [standard] extra bundles uvloop, httptools, and watchfiles.
+  # uvloop cannot build on Android/Termux (libuv's ./configure fails), so
+  # we declare the working components inline and gate uvloop behind the
+  # [uvloop] optional extra — desktop/server profiles pull it via [all].
   "uvicorn>=0.31.0,<1",
+  "httptools>=0.6.3,<0.9",
+  "watchfiles>=0.20,<2",
   # Streaming multipart uploads for the dashboard file manager (NS-501).
   # FastAPI's UploadFile/Form depend on python-multipart; it is NOT pulled in
   # by fastapi itself, so the dashboard's multipart upload endpoint would 500
@@ -197,6 +203,14 @@ Documentation = "https://github.com/matttest0080-prog/hermes-agent-iot/blob/pi2-
 "Upstream project" = "https://github.com/NousResearch/hermes-agent"
 
 [project.optional-dependencies]
+# High-performance event loop — uvloop replaces the stdlib asyncio loop with
+# a libuv-backed implementation for ~2-4x throughput on uvicorn.  Gated as an
+# optional extra because libuv's ./configure does not run on Android/Termux
+# (bionic libc, non-FHS layout).  Desktop and server installs pull this via
+# [all]; the [termux] / [termux-all] profiles intentionally omit it.
+uvloop = [
+  "uvloop>=0.15.1,<0.24; sys_platform != 'win32' and sys_platform != 'cygwin' and sys_platform != 'android' and platform_python_implementation != 'PyPy'",
+]
 # Native Anthropic provider — only needed when provider=anthropic (not via
 # OpenRouter or other aggregators).
 anthropic = ["anthropic==0.87.0"]  # CVE-2026-34450, CVE-2026-34452
@@ -214,7 +228,7 @@ modal = ["modal==1.3.4", "cbor2==5.9.0; platform_machine == 'armv7l'"]
 daytona = ["daytona==0.155.0"]
 vercel = ["vercel==0.7.2"]
 hindsight = ["hindsight-client==0.6.1"]
-dev = ["hermes-agent-iot[full]==0.21.3.post1", "build==1.3.0", "twine==6.2.0", "debugpy==1.8.20", "pytest==9.1.1", "pytest-asyncio==1.3.0", "mcp==2.0.0", "httpx2==2.12.0", "starlette==1.3.1", "ty==0.0.21", "ruff==0.15.10", "setuptools==83.0.0"]  # fork [full] plus upstream dev and the release tools (build/twine) the tag-triggered publish workflow syncs; httpx2 2.12.0: clears the 2.7.0 advisories (GHSA-7mj9-2mp8-4m2p, GHSA-8xx6-hgc6-gc2m, GHSA-f2fp-rgf2-35cp, GHSA-h4x7-gw46-3wm6, GHSA-pf96-p4fj-6566); starlette: CVE-2026-48710; setuptools: 83 (torch >=2.13 requires setuptools 83)
+dev = ["hermes-agent-iot[full]==0.21.4.post1", "build==1.3.0", "twine==6.2.0", "debugpy==1.8.20", "pytest==9.1.1", "pytest-asyncio==1.3.0", "mcp==2.0.0", "httpx2==2.12.0", "starlette==1.3.1", "ty==0.0.21", "ruff==0.15.10", "setuptools==83.0.0"]  # fork [full] plus upstream dev and the release tools (build/twine) the tag-triggered publish workflow syncs; httpx2 2.12.0: clears the 2.7.0 advisories (GHSA-7mj9-2mp8-4m2p, GHSA-8xx6-hgc6-gc2m, GHSA-f2fp-rgf2-35cp, GHSA-h4x7-gw46-3wm6, GHSA-pf96-p4fj-6566); starlette: CVE-2026-48710; setuptools: 83 (torch >=2.13 requires setuptools 83)
 messaging = ["python-telegram-bot[webhooks]==22.8", "discord.py==2.7.1", "PyNaCl==1.6.2", "davey==0.1.4", "aiohttp==3.14.3", "brotlicffi==1.2.0.2", "slack-bolt==1.30.0", "slack-sdk==3.44.1", "qrcode==7.4.2"]  # explicit voice closure replaces upstream's voice extra, whose PyNaCl cap is vulnerable; aiohttp 3.14.3: prior CVEs + GHSA-cq5v-8q36-5273/GHSA-mfx4-hv73-q22v/GHSA-mq44-7p77-q5h7
 cron = []  # croniter is now a core dependency; this extra kept for back-compat
 slack = ["slack-bolt==1.30.0", "slack-sdk==3.44.1", "aiohttp==3.14.3"]
@@ -321,22 +335,22 @@ azure-identity = ["azure-identity==1.25.3"]
 termux = [
   # Baseline Android / Termux path for reliable fresh installs.
   "python-telegram-bot[webhooks]==22.8",
-  "hermes-agent-iot[cron]==0.21.3.post1",
-  "hermes-agent-iot[mcp]==0.21.3.post1",
-  "hermes-agent-iot[honcho]==0.21.3.post1",
-  "hermes-agent-iot[acp]==0.21.3.post1",
+  "hermes-agent-iot[cron]==0.21.4.post1",
+  "hermes-agent-iot[mcp]==0.21.4.post1",
+  "hermes-agent-iot[honcho]==0.21.4.post1",
+  "hermes-agent-iot[acp]==0.21.4.post1",
 ]
 termux-all = [
   # Best-effort "install all" profile for Termux. Same policy as [all]:
   # only includes extras that aren't covered by `tools/lazy_deps.py`.
   # Backends like telegram/slack/dingtalk/feishu/honcho lazy-install at
   # first use, so they're no longer eager-installed here.
-  "hermes-agent-iot[termux]==0.21.3.post1",
-  "hermes-agent-iot[google]==0.21.3.post1",
-  "hermes-agent-iot[homeassistant]==0.21.3.post1",
-  "hermes-agent-iot[sms]==0.21.3.post1",
-  "hermes-agent-iot[web]==0.21.3.post1",
-  "hermes-agent-iot[pty]==0.21.3.post1",
+  "hermes-agent-iot[termux]==0.21.4.post1",
+  "hermes-agent-iot[google]==0.21.4.post1",
+  "hermes-agent-iot[homeassistant]==0.21.4.post1",
+  "hermes-agent-iot[sms]==0.21.4.post1",
+  "hermes-agent-iot[web]==0.21.4.post1",
+  "hermes-agent-iot[pty]==0.21.4.post1",
 ]
 dingtalk = ["dingtalk-stream==0.24.3", "alibabacloud-dingtalk==2.2.42", "qrcode==7.4.2"]
 feishu = ["lark-oapi==1.6.8", "qrcode==7.4.2"]
@@ -402,20 +416,21 @@ all = [
   # [all], `uv sync --locked` on Windows tried to build it from sdist
   # and failed on `make`. Lazy-install routes that build to first use,
   # where the user is expected to have a toolchain available.
-  "hermes-agent-iot[cron]==0.21.3.post1",
-  "hermes-agent-iot[pty]==0.21.3.post1",
-  "hermes-agent-iot[mcp]==0.21.3.post1",
-  "hermes-agent-iot[homeassistant]==0.21.3.post1",
-  "hermes-agent-iot[sms]==0.21.3.post1",
-  "hermes-agent-iot[acp]==0.21.3.post1",
-  "hermes-agent-iot[google]==0.21.3.post1",
-  "hermes-agent-iot[web]==0.21.3.post1",
-  "hermes-agent-iot[youtube]==0.21.3.post1",
+  "hermes-agent-iot[cron]==0.21.4.post1",
+  "hermes-agent-iot[pty]==0.21.4.post1",
+  "hermes-agent-iot[mcp]==0.21.4.post1",
+  "hermes-agent-iot[uvloop]==0.21.4.post1",
+  "hermes-agent-iot[homeassistant]==0.21.4.post1",
+  "hermes-agent-iot[sms]==0.21.4.post1",
+  "hermes-agent-iot[acp]==0.21.4.post1",
+  "hermes-agent-iot[google]==0.21.4.post1",
+  "hermes-agent-iot[web]==0.21.4.post1",
+  "hermes-agent-iot[youtube]==0.21.4.post1",
 ]
-minimal = ["hermes-agent-iot[cli,pty]==0.21.3.post1"]
-iot = ["hermes-agent-iot[minimal,mcp,acp,homeassistant,mqtt,sms]==0.21.3.post1"]
-rag = ["hermes-agent-iot[iot,honcho]==0.21.3.post1"]
-full = ["hermes-agent-iot[all]==0.21.3.post1"]
+minimal = ["hermes-agent-iot[cli,pty]==0.21.4.post1"]
+iot = ["hermes-agent-iot[minimal,mcp,acp,homeassistant,mqtt,sms]==0.21.4.post1"]
+rag = ["hermes-agent-iot[iot,honcho]==0.21.4.post1"]
+full = ["hermes-agent-iot[all]==0.21.4.post1"]
 
 [build-system]
 # setuptools.build_meta + our setup.py bdist_wheel guard import wheel during
@@ -639,6 +654,7 @@ testpaths = ["tests"]
 markers = [
     "integration: marks tests requiring external services (API keys, Modal, etc.)",
     "real_concurrent_gate: opt out of the autouse stub that disables _detect_concurrent_hermes_instances",
+    "real_post_swap_handoff: opt out of the autouse stub that runs the update post-swap tail in-process",
     "real_agent_prewarm: opt out of the autouse stub that disables the tui_gateway deferred agent pre-warm timer",
     "real_retry_backoff: opt out of the tests/agent autouse stub that zeroes jittered_backoff",
     "requires_wal: needs the runtime to actually enable SQLite WAL mode (skipped where Hermes falls back to journal_mode=DELETE)",
