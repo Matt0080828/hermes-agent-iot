@@ -3,11 +3,21 @@
 Written for the Pi2/IoT fork sync. Everything below is measured with `git`/`gh` against
 `NousResearch/hermes-agent`, not copied from a summary.
 
-Status: the sync described here is **in review** (`sync/upstream-v2026.9.24`, PR to `pi2-lite`) and has
-not been tagged or published. The fork version moves `0.21.4.post1 -> 0.21.5.post1`, and every doc pin
-(README, manuals, `IOT_PROJECT.md`) still names the last hardware-verified release `0.21.4.post1` until
-`0.21.5.post1` has actually run on a Pi 2. Tag `iot-v0.21.5.post1`, the GitHub Release and the PyPI
-publish stay staged behind that verification.
+Status: the sync described here shipped as `0.21.5.post1` (tag `iot-v0.21.5.post1`, commit
+`2f6530009ada143010b6c378e09e3fbcedd18447`, wheel SHA-256
+`55b359c0031c0b12792aa000d18264638162bcd5f3dbbcd7294a51f34a224dea`), and the patch release
+`0.21.5.post2` followed on 2026-10-12 (tag `iot-v0.21.5.post2`, commit
+`c8992a283a1e932d3f87df06d6ca397a3e80dc41`, wheel SHA-256
+`a181ad3201509a3c4aeed1b2a7c1b775f9df13fdbb449f1e32748b7d4f4f6439`), carrying the OSV dependency
+remediation (135 -> 0 alerts across the five lockfiles) and the required-checks CI gate fix.
+
+At the time this review was written the sync was still **in review** (`sync/upstream-v2026.9.24`, PR to
+`pi2-lite`) and had not been tagged or published: the fork version moved
+`0.21.4.post1 -> 0.21.5.post1`, every doc pin (README, manuals, `IOT_PROJECT.md`) still named the last
+hardware-verified release `0.21.4.post1` until `0.21.5.post1` had actually run on a Pi 2, and tag
+`iot-v0.21.5.post1`, the GitHub Release and the PyPI publish stayed staged behind that verification. The
+tables below still record the pre-sync baseline they were written against; the doc pins now name
+`0.21.5.post2`.
 
 ## Scope
 
@@ -150,10 +160,14 @@ next cycle: `urllib3` and `pyjwt` do reach the Pi 2 install closure
 (`requirements/pi2/{minimal,iot}.lock`) at upstream's chosen versions, so re-check whether upstream has
 moved them before the next sync.
 
-## Follow-ups (not in this PR)
+## Follow-ups (this PR) — all closed out
 
 - Physical Pi 2 verification of `0.21.5.post1` (isolated venv + isolated `HERMES_HOME`, `[minimal]`
-  install from PyPI once published); the raw log is kept alongside the previous cycle's.
-- Tag `iot-v0.21.5.post1`, GitHub Release and PyPI publish — staged behind that verification.
+  install from PyPI once published) — **done** on 2026-10-07 against the published wheel; repeated for
+  `0.21.5.post2` on 2026-10-12 (device-side `pip download`, SHA-256 matched the index digest, fresh
+  isolated venv, `pip check` clean, `hermes --version` = `Hermes Agent v0.21.5.post2 (2026.9.24)`).
+- Tag `iot-v0.21.5.post1`, GitHub Release and PyPI publish — **done** (2026-10-07). The patch release
+  `iot-v0.21.5.post2` was tagged, published and released on 2026-10-12.
 - Multi-language docs (`README.es.md`, `README.zh-CN.md`, `RASPBERRY_PI2_MANUAL*.md`) get the new version,
-  PyPI digest, workflow URL and commit only after the release exists.
+  PyPI digest, workflow URL and commit only after the release exists — **done**: every doc surface now
+  pins `0.21.5.post2` with the real supply-chain values.
