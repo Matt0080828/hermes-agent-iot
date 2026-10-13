@@ -28,12 +28,13 @@ def _official_update_default():
 @pytest.fixture(autouse=True)
 def _isolate_update(isolated_update_runtime, monkeypatch):
     import shutil
-    from hermes_cli import managed_uv, update_cmd, update_cmd_deps, update_cmd_fleet
+    from hermes_cli import managed_uv, update_cmd, update_cmd_fleet
 
     # The post-restart survivor sweep real-sleeps 3s; no gateways exist here.
     monkeypatch.setattr(update_cmd_fleet, "_force_kill_stuck_gateways", lambda *a, **k: None)
     # The post-pull import probe spawns a real interpreter (~2.5s); the tree is unchanged here.
-    monkeypatch.setattr(update_cmd_deps, "_critical_module_import_failures", lambda *a, **k: {})
+    # The symbol moved to `update_cmd_validation` upstream; `update_cmd` re-exports it.
+    monkeypatch.setattr(update_cmd, "_critical_module_import_failures", lambda *a, **k: {})
     monkeypatch.setattr(managed_uv, "resolve_uv", lambda **kw: shutil.which("uv"))
     monkeypatch.setattr(managed_uv, "ensure_uv", lambda **kw: shutil.which("uv"))
     monkeypatch.setattr(managed_uv, "update_managed_uv", lambda **kw: None)

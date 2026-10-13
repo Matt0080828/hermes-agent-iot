@@ -144,6 +144,41 @@ def isolated_source_completion(monkeypatch):
     monkeypatch.setattr(update_cmd, "run_completion", complete)
 
 
+@pytest.fixture
+def isolated_update_runtime(monkeypatch, tmp_path, request):
+    """Keep mocked updater flows off the host checkout and runtime fleet.
+
+    Restored after the v0.21.7 sync dropped it from this conftest while
+    ``test_update_yes_flag.py`` (fork-owned) still requests it. Three symbols
+    the fixture used to patch no longer exist upstream, so those patches pass
+    ``raising=False``: the fixture's job here is isolation, not the patch.
+    """
+    from hermes_cli import gateway, main, update_cmd, update_cmd_fleet
+    from hermes_cli import update_inventory, update_receipt
+
+    checkout = tmp_path / "isolated-update-checkout"
+    (checkout / ".git").mkdir(parents=True)
+    (checkout / "apps" / "desktop").mkdir(parents=True)
+    monkeypatch.setattr(main, "PROJECT_ROOT", checkout)
+    if hasattr(request.module, "PROJECT_ROOT"):
+        monkeypatch.setattr(request.module, "PROJECT_ROOT", checkout)
+
+    monkeypatch.setattr(gateway, "find_gateway_pids", lambda *a, **k: [])
+    monkeypatch.setattr(gateway, "find_profile_gateway_processes", lambda *a, **k: [])
+    monkeypatch.setattr(gateway, "_get_service_pids", lambda *a, **k: set())
+    monkeypatch.setattr(gateway, "supports_systemd_services", lambda: False)
+    monkeypatch.setattr(main, "_pause_windows_gateways_for_update", lambda: None)
+    monkeypatch.setattr(main, "_resume_windows_gateways_after_update", lambda *a, **k: None)
+    monkeypatch.setattr(main, "_detect_venv_python_processes", list)
+    monkeypatch.setattr(main, "_restore_active_tool_dependencies", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(update_cmd, "_clear_windows_venv_holders_or_exit", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(update_cmd, "_finish_dashboard_update_cleanup", lambda *a, **k: None)
+    monkeypatch.setattr(update_cmd, "_apply_pending_fleet_restart_catchup", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(update_cmd_fleet, "_restart_macos_launchd_gateways", lambda *a, **k: None)
+    monkeypatch.setattr(update_inventory, "collect_runtime_inventory", lambda: None)
+    monkeypatch.setattr(update_receipt, "collect_fleet_versions", lambda *a, **k: [])
+
+
 @pytest.fixture(autouse=True)
 def _reset_prompt_toolkit_output_cache():
     """Clear prompt_toolkit's cached AppSession output around each CLI test.

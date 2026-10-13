@@ -4,11 +4,15 @@ import stat
 import subprocess
 import sys
 import tomllib
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 
 import pytest
 
+from tests.pi2_python import supported_python
+
 ROOT = Path(__file__).resolve().parents[1]
+DISTRIBUTION = "hermes-agent-iot"
 
 
 def metadata():
@@ -99,6 +103,50 @@ def _run_cli(tmp_path, *args, extra_env=None, installed_distributions=()):
     return subprocess.run(
         [sys.executable, "-m", "hermes_cli.iot_cli", *args],
         cwd=ROOT, env=env, text=True, capture_output=True, check=False,
+    )
+
+
+@pytest.fixture(autouse=True)
+def installed_application_distribution(tmp_path_factory, monkeypatch):
+    """Present the app's own distribution, as an installed virtualenv would.
+
+    The profile checks read ``importlib.metadata`` for the running distribution,
+    and the test runner's environment carries the locked dependencies only — it
+    never installs the checkout. Synthesize the distribution the way ``_run_cli``
+    already synthesizes the profile dependencies, so these tests read the same
+    metadata on a device and on a bare test runner.
+    """
+    try:
+        importlib_metadata.version(DISTRIBUTION)
+        return
+    except importlib_metadata.PackageNotFoundError:
+        pass
+    project = metadata()["project"]
+    site = tmp_path_factory.mktemp("application-dist")
+    dist_info = site / f"{DISTRIBUTION.replace('-', '_')}-{project['version']}.dist-info"
+    dist_info.mkdir()
+    # `_requirements_for_extra` reads the distribution's own requires list and
+    # expands the self-referencing aggregate extras, so the synthetic metadata
+    # must carry the same Requires-Dist lines a real wheel would.
+    lines = [
+        "Metadata-Version: 2.4",
+        f"Name: {DISTRIBUTION}",
+        f"Version: {project['version']}",
+    ]
+    lines += [f"Requires-Dist: {dependency}" for dependency in project["dependencies"]]
+    for extra, dependencies in project["optional-dependencies"].items():
+        for dependency in dependencies:
+            spec, _, marker = dependency.partition(";")
+            marker = marker.strip()
+            # setuptools parenthesises the declared marker before adding the
+            # extra condition; `A or B and extra == "x"` would otherwise read as
+            # `A or (B and ...)`, selecting the requirement for every extra.
+            condition = f'({marker}) and extra == "{extra}"' if marker else f'extra == "{extra}"'
+            lines.append(f"Requires-Dist: {spec.rstrip()} ; {condition}")
+    (dist_info / "METADATA").write_text("\n".join(lines) + "\n\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(site))
+    monkeypatch.setenv(
+        "PYTHONPATH", os.pathsep.join(filter(None, (str(site), os.environ.get("PYTHONPATH"))))
     )
 
 
@@ -304,7 +352,7 @@ def test_pi_installer_rejects_symlinked_venv_without_sourcing_activate(tmp_path)
             str(venv),
         ],
         cwd=ROOT,
-        env={**os.environ, "PYTHON": sys.executable, "HERMES_HOME": str(tmp_path / "home")},
+        env={**os.environ, "PYTHON": supported_python(), "HERMES_HOME": str(tmp_path / "home")},
         text=True,
         capture_output=True,
         check=False,

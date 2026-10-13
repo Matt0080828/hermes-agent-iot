@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-import yaml
+from hermes_yaml import safe_load
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,7 +10,7 @@ RELEASE_PYTHON = '"$RELEASE_PYTHON"'
 
 
 def workflow_jobs():
-    data = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    data = safe_load(WORKFLOW.read_text(encoding="utf-8"))
     return data["jobs"]
 
 

@@ -7,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.pi2_python import supported_python
+
 
 def write_minimal_repo(root: Path) -> None:
     (root / "pyproject.toml").write_text(
@@ -101,7 +103,7 @@ class Pi2InstallGuardTests(unittest.TestCase):
             check=False,
             text=True,
             capture_output=True,
-            env={**os.environ, "PYTHON": sys.executable},
+            env={**os.environ, "PYTHON": supported_python()},
         )
 
     def test_existing_venv_rejects_group_or_world_writable_security_components(self) -> None:
@@ -315,9 +317,8 @@ class Pi2InstallGuardTests(unittest.TestCase):
         self.assertIn("safe no-clobber Python entrypoint", result.stdout)
 
     def test_real_pi2_templates_use_active_cli_platform_toolsets(self) -> None:
-        import yaml
-
         from hermes_cli.tools_config import _get_platform_tools
+        from hermes_yaml import safe_load
 
         repo = Path(__file__).resolve().parents[1]
         expected_mqtt = {
@@ -329,7 +330,7 @@ class Pi2InstallGuardTests(unittest.TestCase):
 
         for name, mqtt_enabled in expected_mqtt.items():
             with self.subTest(profile=name):
-                config = yaml.safe_load((repo / "templates" / name).read_text(encoding="utf-8"))
+                config = safe_load((repo / "templates" / name).read_text(encoding="utf-8"))
                 self.assertNotIn("toolsets", config, "legacy top-level toolsets key is ignored")
                 self.assertIn("cli", config.get("platform_toolsets", {}))
                 resolved = _get_platform_tools(config, "cli")
@@ -345,12 +346,12 @@ class Pi2InstallGuardTests(unittest.TestCase):
         )
         self.assertNotIn('source "$VENV_DIR/bin/activate"', setup_text)
     def test_low_resource_profiles_have_local_llama_fallback(self) -> None:
-        import yaml
+        from hermes_yaml import safe_load
 
         repo = Path(__file__).resolve().parents[1]
         for name in ("config.pi2-core.yaml", "config.pi2-native.yaml", "config.pi2-rag.yaml"):
             with self.subTest(profile=name):
-                config = yaml.safe_load((repo / "templates" / name).read_text(encoding="utf-8"))
+                config = safe_load((repo / "templates" / name).read_text(encoding="utf-8"))
                 fallback = config["fallback_providers"]
                 self.assertEqual(len(fallback), 1)
                 self.assertEqual(fallback[0]["provider"], "custom")
