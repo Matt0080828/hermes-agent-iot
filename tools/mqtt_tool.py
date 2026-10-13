@@ -40,9 +40,12 @@ _MAX_INBOUND_RESPONSE_BYTES = 256 * 1024
 
 def _mqtt_client_factory():
     try:
-        from tools.lazy_deps import ensure
+        # Upstream retired the tools.lazy_deps installer for production code
+        # (scripts/ci/check_lazy_deps_imports.py blocks it): pm.ensure_import is the
+        # only lazy-install surface, keyed by the pyproject extra name.
+        from pm import ensure_import
 
-        ensure("tool.mqtt", prompt=False)
+        ensure_import("mqtt")
     except Exception:
         # If lazy install is unavailable/disabled, fall through to the import so
         # the handler reports the concrete ModuleNotFoundError to the caller.

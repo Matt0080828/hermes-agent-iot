@@ -29,6 +29,15 @@ mqtt = ["paho-mqtt==2.1.0"]
         'LAZY_DEPS = {"tool.dashboard": ("fastapi==0.133.1", "uvicorn==0.41.0"), "tool.mqtt": ("paho-mqtt==2.1.0",)}\n',
         encoding="utf-8",
     )
+    # Upstream retired tools.lazy_deps for production code (check_lazy_deps_imports.py
+    # blocks it, and pm.ensure_import is the only lazy-install surface), so the MQTT
+    # tool must reach its extra through pm instead of the retired registry.
+    (root / "tools" / "mqtt_tool.py").write_text(
+        'from pm import ensure_import\n\n'
+        'def _ensure_mqtt():\n'
+        '    ensure_import("mqtt")\n',
+        encoding="utf-8",
+    )
     (root / "hermes_cli").mkdir()
     (root / "hermes_cli" / "web_server.py").write_text(
         'config = uvicorn.Config(app, host="127.0.0.1", port=9119, loop="asyncio")\n',
@@ -444,6 +453,47 @@ class Pi2InstallGuardTests(unittest.TestCase):
             result = self.run_guard(repo)
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_pi2_install_guard_requires_pm_lazy_install_for_mqtt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            (repo / "tools" / "mqtt_tool.py").write_text(
+                "import paho.mqtt.client\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('pm.ensure_import("mqtt")', result.stdout)
+
+    def test_pi2_install_guard_rejects_retired_lazy_deps_in_mqtt_tool(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            (repo / "tools" / "mqtt_tool.py").write_text(
+                "from pm import ensure_import\n"
+                "from tools.lazy_deps import ensure as _retired\n\n"
+                'ensure_import("mqtt")\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("retired lazy-install registry", result.stdout)
+
+    def test_pi2_install_guard_requires_mqtt_tool_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write_minimal_repo(repo)
+            (repo / "tools" / "mqtt_tool.py").unlink()
+
+            result = self.run_guard(repo)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("MQTT must stay an optional Pi2 tool", result.stdout)
 
     def test_real_pi2_locks_exist_and_exclude_uninstallable_packages(self) -> None:
         repo = Path(__file__).resolve().parents[1]

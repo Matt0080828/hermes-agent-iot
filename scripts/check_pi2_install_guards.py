@@ -272,9 +272,26 @@ def check_iot_optional_deps(repo: Path, failures: FailureCollector) -> None:
     if "paho-mqtt" not in mqtt_extra:
         failures.add("pyproject.toml should expose optional-dependencies.mqtt with paho-mqtt")
 
-    lazy_deps = repo / "tools" / "lazy_deps.py"
-    if lazy_deps.exists() and "tool.mqtt" not in lazy_deps.read_text(encoding="utf-8"):
-        failures.add("tools/lazy_deps.py should lazy-install paho-mqtt through the tool.mqtt feature")
+    # Upstream retired tools/lazy_deps for production code: pm.ensure_import is the only
+    # lazy-install surface (scripts/ci/check_lazy_deps_imports.py blocks the old stub), so the
+    # MQTT tool must reach its extra through pm instead of the retired registry.
+    mqtt_tool = repo / "tools" / "mqtt_tool.py"
+    if mqtt_tool.exists():
+        mqtt_text = mqtt_tool.read_text(encoding="utf-8")
+        if 'ensure_import("mqtt")' not in mqtt_text:
+            failures.add(
+                "tools/mqtt_tool.py should lazy-install paho-mqtt through pm.ensure_import(\"mqtt\")"
+            )
+        # Match real import statements only: prose/comments may name the retired module.
+        retired_imports = (
+            "from tools.lazy_deps import",
+            "from tools.lazy_deps.",
+            "import tools.lazy_deps",
+        )
+        if any(marker in mqtt_text for marker in retired_imports):
+            failures.add("tools/mqtt_tool.py must not import the retired lazy-install registry")
+    else:
+        failures.add("tools/mqtt_tool.py is missing; MQTT must stay an optional Pi2 tool")
 
 
 def check_pi2_context_templates(repo: Path, failures: FailureCollector) -> None:

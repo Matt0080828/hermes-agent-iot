@@ -49,7 +49,7 @@ def test_build_job_uses_a_real_release_virtualenv_for_all_python_commands():
         if step.get("name") == "Install release test and build dependencies"
     )
     assert "uv==0.11.13" in install_run
-    assert "uv sync --frozen --extra dev --extra rag" in install_run
+    assert "uv sync --frozen --group dev --extra full --extra rag" in install_run
     assert "pip install --disable-pip-version-check\n-e" not in install_run
 
     release_test_run = next(

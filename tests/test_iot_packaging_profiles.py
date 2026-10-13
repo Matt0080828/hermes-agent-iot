@@ -20,21 +20,27 @@ def test_distribution_version_scripts_and_aggregate_extras():
 
     project = metadata()["project"]
     assert project["name"] == "hermes-agent-iot"
-    assert project["version"] == "0.21.5.post2"
+    assert project["version"] == "0.21.7.post1"
     assert __version__ == project["version"]
     assert __release_date__ == "2026.9.24"
     assert project["scripts"]["hermes-iot"] == "hermes_cli.iot_cli:main"
     assert {"hermes", "hermes-agent", "hermes-acp"} <= project["scripts"].keys()
     extras = project["optional-dependencies"]
-    assert extras["minimal"] == ["hermes-agent-iot[cli,pty]==0.21.5.post2"]
-    assert extras["iot"] == ["hermes-agent-iot[minimal,mcp,acp,homeassistant,mqtt,sms]==0.21.5.post2"]
-    assert extras["rag"] == ["hermes-agent-iot[iot,honcho]==0.21.5.post2"]
-    assert extras["full"] == ["hermes-agent-iot[all]==0.21.5.post2"]
-    assert "hermes-agent-iot[full]==0.21.5.post2" in extras["dev"]
-    assert "pytest==9.1.1" in extras["dev"]
+    assert extras["minimal"] == ["hermes-agent-iot[cli,pty]==0.21.7.post1"]
+    assert extras["iot"] == ["hermes-agent-iot[minimal,mcp,acp,homeassistant,mqtt,sms]==0.21.7.post1"]
+    assert extras["rag"] == ["hermes-agent-iot[iot,honcho]==0.21.7.post1"]
+    assert extras["full"] == ["hermes-agent-iot[all]==0.21.7.post1"]
+    # The fork retired its `dev` extra: uv records build/test tooling in
+    # [dependency-groups] dev only (asserted against the lock in
+    # tests/test_packaging_metadata.py), and `uv sync --extra full` covers the
+    # [full] self-reference the retired extra used to carry.
+    assert "dev" not in extras
+    dev_group = metadata()["dependency-groups"]["dev"]
+    assert "pytest==9.1.1" in dev_group
+    assert {"build==1.3.0", "twine==6.2.0"} <= set(dev_group)
     assert extras["vercel"] == ["vercel==0.7.2"]
-    from tools.lazy_deps import LAZY_DEPS
-    assert LAZY_DEPS["terminal.vercel"] == ("vercel==0.7.2",)
+    # Upstream retired tools.lazy_deps for production code (pm.ensure_import is the only
+    # lazy-install surface), so the vercel pin is asserted where it now lives: the extra itself.
     assert metadata()["tool"]["uv"]["exclude-newer-package"]["vercel"] is False
     for profile in ("minimal", "iot", "rag"):
         assert "vercel" not in " ".join(extras[profile]).lower()
@@ -45,11 +51,14 @@ def test_distribution_version_scripts_and_aggregate_extras():
     assert not any("hermes-agent[" in spec for spec in all_specs)
 
 
-def test_vercel_recovery_guidance_uses_the_locked_sdk_version():
+def test_vercel_recovery_guidance_defers_to_the_setup_installer():
     doctor = (ROOT / "hermes_cli" / "doctor_tools.py").read_text(encoding="utf-8")
-    assert "python -m pip install vercel==0.7.2" in doctor
-    assert "python -m pip install vercel)" not in doctor
-    assert 'python -m pip install vercel"' not in doctor
+    # Upstream moved vercel recovery onto `hermes setup terminal`, which installs the
+    # pinned [vercel] extra itself: the doctor must not hardcode an SDK version that can
+    # drift from the extra (the pin is asserted on extras["vercel"] above).
+    assert "run hermes setup terminal" in doctor
+    assert "select Vercel Sandbox" in doctor
+    assert "python -m pip install vercel" not in doctor
 
 
 def test_profile_templates_are_packaged_and_dev_reuses_full():
@@ -112,7 +121,7 @@ def test_setup_atomically_creates_private_config_and_secret_free_manifest(tmp_pa
     data = json.loads(manifest.read_text())
     assert data == {
         "distribution": "hermes-agent-iot",
-        "version": "0.21.5.post2",
+        "version": "0.21.7.post1",
         "profile": "iot",
         "template": "config.pi2-native.yaml",
         "environment": str(sys.prefix),
@@ -376,7 +385,7 @@ def test_profile_show_reports_install_record(tmp_path):
     assert _run_cli(tmp_path, "setup", "--profile", "dev").returncode == 0
     result = _run_cli(tmp_path, "profile", "show")
     assert result.returncode == 0
-    for value in ("hermes-agent-iot", "0.21.5.post2", "dev", "config.pi2-full.yaml", str(sys.prefix)):
+    for value in ("hermes-agent-iot", "0.21.7.post1", "dev", "config.pi2-full.yaml", str(sys.prefix)):
         assert value in result.stdout
 
 
