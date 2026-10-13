@@ -11,7 +11,7 @@
     "tests-js"
   ],
   "scripts": {
-    "postinstall": "echo '✅ Node dependencies installed. Run: python run_agent.py --help'",
+    "postinstall": "echo '\u2705 Node dependencies installed. Run: python run_agent.py --help'",
     "install:root": "npm install --workspaces=false",
     "install:web": "npm install --workspace web",
     "install:tui": "npm install --workspace ui-tui",
@@ -86,7 +86,8 @@
       ".": "8.5.23",
       "nanoid": "3.3.18"
     },
-    "tar": "7.5.22"
+    "tar": "7.5.22",
+    "yaml@^2": "2.8.3"
   },
   "engines": {
     "node": "^22.22.0 || ^24.11.0 || >=26.0.0",

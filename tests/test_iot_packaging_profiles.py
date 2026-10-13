@@ -341,7 +341,6 @@ def test_setup_race_leaves_config_and_record_untouched(tmp_path, monkeypatch, ca
     def competing_create(path, content):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("competing-config\n", encoding="utf-8")
-        return None
 
     monkeypatch.setattr(iot_cli, "_atomic_private_create", competing_create)
     assert iot_cli.setup_profile("minimal") == 0

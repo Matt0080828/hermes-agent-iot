@@ -2153,7 +2153,7 @@ def _restore_fallback_runtime(agent, snapshot: dict) -> None:
         if hasattr(agent, "_transport_cache"):
             delattr(agent, "_transport_cache")
     else:
-        setattr(agent, "_transport_cache", transport_cache)
+        agent._transport_cache = transport_cache
         if isinstance(transport_cache, dict):
             transport_cache.clear()
             transport_cache.update(snapshot["transport_cache_contents"] or {})
@@ -2163,7 +2163,7 @@ def _restore_fallback_runtime(agent, snapshot: dict) -> None:
         if hasattr(agent, "context_compressor"):
             delattr(agent, "context_compressor")
     else:
-        setattr(agent, "context_compressor", compressor)
+        agent.context_compressor = compressor
         compressor_state = snapshot["compressor_state"]
         if compressor is not None and compressor_state is not None:
             vars(compressor).clear()

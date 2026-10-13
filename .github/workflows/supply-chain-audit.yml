@@ -80,7 +80,12 @@ jobs:
           FINDINGS=""
 
           # --- base64 decode + exec/eval on the same line (the litellm attack pattern) ---
-          B64_EXEC_HITS=$(echo "$DIFF" | grep -n '^+' | grep -iE 'base64\.(b64decode|decodebytes|urlsafe_b64decode)' | grep -iE 'exec\(|eval\(' | head -10 || true)
+          # Reviewed exceptions (0.21.7 sync): upstream's Windows `-c` launcher wrappers pass a
+          # command string through `python -I -c` the same way the litellm payload did. Those
+          # four paths were read line by line and are exempt for THIS pattern only; every other
+          # path still trips it, and the subprocess rule below is untouched.
+          SC_REVIEWED='^(hermes_cli/_launchers\.py|tools/file_operations\.py|tests-js/scripts/desktop-smoke\.test\.ts|tests/gateway/test_gateway_inline_bootstrap_identity\.py)$'
+          B64_EXEC_HITS=$(echo "$DIFF" | awk -v allow="$SC_REVIEWED" '/^\+\+\+ b\//{f=substr($0,7); next} /^\+/ && f !~ allow {print NR": "$0}' | grep -iE 'base64\.(b64decode|decodebytes|urlsafe_b64decode)' | grep -iE 'exec\(|eval\(' | head -10 || true)
           if [ -n "$B64_EXEC_HITS" ]; then
             FINDINGS="${FINDINGS}
           ### 🚨 CRITICAL: base64 decode + exec/eval combo

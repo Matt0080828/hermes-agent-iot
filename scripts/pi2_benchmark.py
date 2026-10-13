@@ -100,6 +100,7 @@ def import_cost(module: str) -> dict:
     proc = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
+        check=False,
     )
     wall = time.perf_counter() - t0
     if proc.returncode != 0:
@@ -137,6 +138,7 @@ def run_cli(argv: list, timeout_s: int = 300) -> dict:
         proc = subprocess.run(
             [sys.executable, "-c", CLI_WRAPPER, *argv],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_s,
+            check=False,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return {"argv": argv, "error": str(exc)}
@@ -291,7 +293,7 @@ def main(argv=None) -> int:
 
     if args.compare:
         try:
-            with open(args.compare, encoding="utf-8") as fh:
+            with open(args.compare, encoding="utf-8-sig") as fh:
                 result["comparison"] = compare(result, json.load(fh))
         except (OSError, ValueError) as exc:
             print(f"cannot compare against {args.compare}: {exc}", file=sys.stderr)

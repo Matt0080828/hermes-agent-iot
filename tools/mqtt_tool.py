@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 import json
 import math
 import os
@@ -237,7 +237,7 @@ def _message_to_dict(msg: Any) -> dict[str, Any]:
         "payload": payload,
         "qos": int(getattr(msg, "qos", 0) or 0),
         "retain": bool(getattr(msg, "retain", False)),
-        "received_at": datetime.now(timezone.utc).isoformat(),
+        "received_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -292,7 +292,7 @@ def _subscribe_recent(topic_filter: str, *, timeout_seconds: float, max_messages
     subscribed = threading.Event()
     subscribe_errors: list[str] = []
 
-    def on_message(client_obj, userdata, msg):  # noqa: ANN001 - paho callback signature
+    def on_message(client_obj, userdata, msg):
         nonlocal accepted_bytes, dropped_messages, dropped_bytes
         payload_bytes = _inbound_payload_size(msg)
         if payload_bytes > _MAX_INBOUND_PAYLOAD_BYTES:
@@ -313,7 +313,7 @@ def _subscribe_recent(topic_filter: str, *, timeout_seconds: float, max_messages
         messages.append(message)
         accepted_bytes += message_bytes
 
-    def on_connect(client_obj, userdata, flags, reason_code, properties=None):  # noqa: ANN001
+    def on_connect(client_obj, userdata, flags, reason_code, properties=None):
         rc = getattr(reason_code, "value", reason_code)
         if rc not in (0, None):
             subscribe_errors.append(f"MQTT connect failed with rc={rc}")
@@ -325,7 +325,7 @@ def _subscribe_recent(topic_filter: str, *, timeout_seconds: float, max_messages
             subscribe_errors.append(f"MQTT subscribe failed with rc={sub_rc}")
             subscribed.set()
 
-    def on_subscribe(client_obj, userdata, mid, reason_codes, properties=None):  # noqa: ANN001
+    def on_subscribe(client_obj, userdata, mid, reason_codes, properties=None):
         rejection = _subscription_rejection(reason_codes)
         if rejection is not None:
             subscribe_errors.append(f"MQTT subscription rejected: {rejection}")
@@ -378,7 +378,7 @@ def _command_and_wait(
     subscribed = threading.Event()
     subscribe_errors: list[str] = []
 
-    def on_message(client_obj, userdata, msg):  # noqa: ANN001
+    def on_message(client_obj, userdata, msg):
         nonlocal accepted_bytes, dropped_messages, dropped_bytes
         payload_bytes = _inbound_payload_size(msg)
         if payload_bytes > _MAX_INBOUND_PAYLOAD_BYTES:
@@ -399,7 +399,7 @@ def _command_and_wait(
         messages.append(message)
         accepted_bytes += message_bytes
 
-    def on_connect(client_obj, userdata, flags, reason_code, properties=None):  # noqa: ANN001
+    def on_connect(client_obj, userdata, flags, reason_code, properties=None):
         rc = getattr(reason_code, "value", reason_code)
         if rc not in (0, None):
             subscribe_errors.append(f"MQTT connect failed with rc={rc}")
@@ -411,7 +411,7 @@ def _command_and_wait(
             subscribe_errors.append(f"MQTT subscribe failed with rc={sub_rc}")
             subscribed.set()
 
-    def on_subscribe(client_obj, userdata, mid, reason_codes, properties=None):  # noqa: ANN001
+    def on_subscribe(client_obj, userdata, mid, reason_codes, properties=None):
         rejection = _subscription_rejection(reason_codes)
         if rejection is not None:
             subscribe_errors.append(f"MQTT state subscription rejected: {rejection}")

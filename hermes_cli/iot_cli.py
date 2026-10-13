@@ -172,7 +172,7 @@ def setup_profile(profile: str) -> int:
         _ensure_private_env(home)
         return 0
 
-    config_content = template.read_text(encoding="utf-8")
+    config_content = template.read_text(encoding="utf-8-sig")
     config_identity = _atomic_private_create(config, config_content)
     if config_identity is None:
         print(f"Existing {config} left untouched")
@@ -210,7 +210,7 @@ def show_profile() -> int:
         print(f"No install profile record found at {record_path}", file=sys.stderr)
         return 1
     try:
-        record = json.loads(record_path.read_text(encoding="utf-8"))
+        record = json.loads(record_path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
         print(f"Cannot read install profile record: {exc}", file=sys.stderr)
         return 1

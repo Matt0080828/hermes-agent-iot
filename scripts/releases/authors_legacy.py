@@ -2040,4 +2040,10 @@ LEGACY_AUTHOR_MAP = {
     "1torhan@protonmail.com": "uzaylisak",  # PR #29988 salvage (detect_local_server_type process-lifetime cache)
     "zhchl@hermes-agent.local": "8294",  # PR #50572 salvage (honor config context_length on banner)
     "yansh2017@gmail.com": "ya-nsh",  # PR #26790 salvage (normalize local terminal relative cwd; #26783)
+    # Case-variant of contributors/emails/halldrix@users.noreply.github.com. The
+    # contributor-check existence test is case-sensitive (`test -f`) while
+    # scripts/check-case-collisions.py forbids two tracked paths differing only by case,
+    # so the capitalised spelling (commit cc269a7d0a inside the upstream 0.21.7 delta)
+    # cannot get its own directory file and resolves through this frozen map instead.
+    "Halldrix@users.noreply.github.com": "Halldrix",
 }

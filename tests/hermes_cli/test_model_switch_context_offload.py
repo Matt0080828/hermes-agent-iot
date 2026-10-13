@@ -81,7 +81,7 @@ async def test_event_loop_stays_responsive_during_resolution(slow_probe):
             t0 = time.monotonic()
             try:
                 await asyncio.wait_for(stop.wait(), timeout=interval)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
             lags.append(time.monotonic() - t0 - interval)
 

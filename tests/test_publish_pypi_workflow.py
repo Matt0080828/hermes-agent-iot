@@ -102,7 +102,7 @@ def test_release_ancestry_gate_accepts_current_and_ancestor_but_rejects_off_bran
 
     for accepted in (ancestor, tip):
         result = subprocess.run(
-            ["bash", str(script), accepted], cwd=repo, text=True, capture_output=True
+            ["bash", str(script), accepted], cwd=repo, text=True, capture_output=True, check=False
         )
         assert result.returncode == 0, result.stderr
 
@@ -112,7 +112,7 @@ def test_release_ancestry_gate_accepts_current_and_ancestor_but_rejects_off_bran
     _git(repo, "commit", "-qm", "off")
     off_branch = _git(repo, "rev-parse", "HEAD")
     rejected = subprocess.run(
-        ["bash", str(script), off_branch], cwd=repo, text=True, capture_output=True
+        ["bash", str(script), off_branch], cwd=repo, text=True, capture_output=True, check=False
     )
     assert rejected.returncode != 0
     assert "not an ancestor" in rejected.stderr
