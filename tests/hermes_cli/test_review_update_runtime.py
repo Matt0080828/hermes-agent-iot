@@ -12,6 +12,11 @@ from hermes_cli import source_completion, venv_sync
 
 
 def test_pre_pm_version_reads_checkout_stamp_without_importing_pm():
+    # The IoT fork keeps a literal fallback for trees without an install stamp (Pi2 devices
+    # install the wheel with plain pip, which writes none): the stamp still wins when present,
+    # but the no-stamp answer is the shipped version, not upstream's "0.0.0" placeholder.
+    from hermes_cli import _FALLBACK_VERSION
+
     root = Path(__file__).resolve().parents[2]
     code = (
         "import builtins\n"
@@ -29,7 +34,7 @@ def test_pre_pm_version_reads_checkout_stamp_without_importing_pm():
     assert result.returncode == 0, result.stderr
     stamp = root / "install-stamp.json"
     expected = json.loads(stamp.read_text(encoding="utf-8-sig")).get("baseVersion") if stamp.exists() else None
-    assert result.stdout.strip() == (expected or "0.0.0")
+    assert result.stdout.strip() == (expected or _FALLBACK_VERSION)
 
 
 @pytest.mark.platforms("posix")

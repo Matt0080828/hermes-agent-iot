@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.ci.fork_workflow_paths import require_upstream_ci_yaml
+
 _PATH = Path(__file__).resolve().parents[2] / "scripts" / "ci" / "classify_changes.py"
 _spec = importlib.util.spec_from_file_location("classify_changes", _PATH)
 if _spec is None or _spec.loader is None:
@@ -521,6 +523,7 @@ _REPO = Path(__file__).resolve().parents[2]
 
 
 def _yaml(rel: str) -> dict:
+    require_upstream_ci_yaml(_REPO / rel)
     yaml = pytest.importorskip("hermes_yaml")
     return yaml.safe_load((_REPO / rel).read_text(encoding="utf-8-sig"))
 

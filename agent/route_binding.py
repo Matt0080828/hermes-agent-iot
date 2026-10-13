@@ -8,22 +8,34 @@ is the inverse that ``restore_primary_runtime`` runs once its gates pass.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Tuple
 
 from utils import base_url_host_matches
 
 logger = logging.getLogger(__name__)
 
 
-def bind_route_entry(agent: Any, entry: dict[str, Any], provider: str, model: str) -> Optional[tuple[str, str]]:
-    """Swap ``agent`` onto ``entry`` (a fallback-chain-shaped dict). Returns ``(old_model,
-    old_provider)``, or None when the provider has no usable client. Sets ``_fallback_activated``
-    so the next turn's ``restore_primary_runtime`` reverts it; raises on a failed swap."""
+class RouteCandidate(NamedTuple):
+    """A resolved fallback route that no live runtime state has been moved onto yet."""
+
+    client: Any
+    model: str
+    provider: str
+    base_url: str
+    api_mode: str
+
+
+def resolve_route_candidate(
+    agent: Any, entry: dict[str, Any], provider: str, model: str
+) -> Optional[RouteCandidate]:
+    """Resolve ``entry`` into a client + route without touching the agent's live runtime.
+
+    ``try_activate_fallback`` resolves first so it can reject a candidate (the fork: a window
+    below the profile's tool-context floor) while the agent still holds the runtime it had.
+    Returns None when the provider has no usable client.
+    """
     from agent.auxiliary_client import resolve_provider_client
-    from agent.chat_completion_helpers import (
-        _fallback_api_mode_hint, _fallback_api_mode_resolved, _rebind_fallback_credential_pool,
-        _reresolve_fallback_reasoning_config, _rescope_fallback_extra_body, _update_fallback_context_compressor,
-    )
+    from agent.chat_completion_helpers import _fallback_api_mode_hint, _fallback_api_mode_resolved
     from hermes_cli.fallback_config import resolve_entry_api_key
     # Pass the entry's base_url/api_key so custom endpoints (Ollama Cloud) resolve instead
     # of falling through to OpenRouter defaults.
@@ -58,11 +70,31 @@ def bind_route_entry(agent: Any, entry: dict[str, Any], provider: str, model: st
             api_mode = "chat_completions"
         elif not api_mode_explicit and api_mode == "chat_completions":
             api_mode = _fallback_api_mode_resolved(agent, provider, model, base_url)
+    return RouteCandidate(client, model, provider, base_url, api_mode)
+
+
+def bind_resolved_route(
+    agent: Any, entry: dict[str, Any], candidate: RouteCandidate, context_length: int | None = None
+) -> tuple[str, str]:
+    """Move ``agent`` onto a candidate from :func:`resolve_route_candidate`.
+
+    ``context_length`` is the window already resolved for the candidate (the fallback path
+    validates it against the profile floor first); passing it keeps the compressor update
+    from probing provider metadata a second time. Returns ``(old_model, old_provider)``. Sets
+    ``_fallback_activated`` so the next turn's ``restore_primary_runtime`` reverts it; raises
+    on a failed swap.
+    """
+    from agent.chat_completion_helpers import (
+        _rebind_fallback_credential_pool, _reresolve_fallback_reasoning_config,
+        _rescope_fallback_extra_body, _update_fallback_context_compressor, entry_context_length,
+    )
+    client, model, provider = candidate.client, candidate.model, candidate.provider
+    base_url, api_mode = candidate.base_url, candidate.api_mode
 
     old_model, old_provider, old_base_url = agent.model, agent.provider, agent.base_url
-    # Clear the per-config context_length override so the new model's own context window is
-    # resolved instead of the previous model's stale value (#22387).
-    agent._config_context_length = None
+    # Never inherit the primary model's pin across providers: apply the entry's own
+    # context_length (None clears it) so its window is resolved fresh (#22387).
+    agent._config_context_length = entry_context_length(entry)
     agent.model, agent.provider, agent.requested_provider = model, provider, provider
     agent.base_url, agent.api_mode = base_url, api_mode
     # reasoning_content echo opt-in travels with the active provider; restore_primary_runtime reverts it.
@@ -87,10 +119,21 @@ def bind_route_entry(agent: Any, entry: dict[str, Any], provider: str, model: st
     agent._use_prompt_caching, agent._use_native_cache_layout = agent._anthropic_prompt_cache_policy(
         provider=provider, base_url=base_url, api_mode=api_mode, model=model)
     agent._ensure_lmstudio_runtime_loaded()  # LM Studio: preload before probing context length
-    _update_fallback_context_compressor(agent)
+    _update_fallback_context_compressor(agent, context_length)
     _reresolve_fallback_reasoning_config(agent)
     _rescope_fallback_extra_body(agent, old_model, old_provider, old_base_url)
     return old_model, old_provider
+
+
+def bind_route_entry(agent: Any, entry: dict[str, Any], provider: str, model: str) -> Optional[tuple[str, str]]:
+    """Swap ``agent`` onto ``entry`` (a fallback-chain-shaped dict), resolving in one step.
+
+    Returns ``(old_model, old_provider)``, or None when the provider has no usable client.
+    """
+    candidate = resolve_route_candidate(agent, entry, provider, model)
+    if candidate is None:
+        return None
+    return bind_resolved_route(agent, entry, candidate)
 
 
 def reinstall_runtime_snapshot(agent: Any, rt: dict[str, Any]) -> None:

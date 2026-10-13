@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.ci.fork_workflow_paths import require_upstream_ci_yaml
+
 _PATH = Path(__file__).resolve().parents[2] / "scripts" / "ci" / "live_comment.py"
 _spec = importlib.util.spec_from_file_location("live_comment", _PATH)
 if _spec is None or _spec.loader is None:
@@ -142,6 +144,7 @@ def test_the_merge_gate_never_shows_as_a_job_in_the_comment():
     every rename must reach the infra list, or the comment lists the gate as a job."""
     yaml = pytest.importorskip("hermes_yaml")
     root = Path(__file__).resolve().parents[2]
+    require_upstream_ci_yaml(root / ".github/workflows/ci.yaml")
     ci = yaml.safe_load((root / ".github/workflows/ci.yaml").read_text(encoding="utf-8"))
     gate = ci["jobs"]["all-checks-pass"]["name"]
     completed, pending, _ = classify_jobs([{"name": gate, "status": "completed", "conclusion": "success"}])

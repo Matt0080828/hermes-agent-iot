@@ -57,6 +57,18 @@ def test_jobs_only_read_declared_dependencies():
 
 
 def test_no_workflow_runs_from_a_tag_push():
+    # The IoT fork releases from tags: `publish-pypi.yml` is fork-only and publishes
+    # `iot-v*` to PyPI, and `install-e2e.yml` carries fork-added `push.tags` that
+    # install/upgrade-test the arm/pi2 release tags on real devices. Both are
+    # deliberate release paths; the pattern set is closed, so any new tag trigger —
+    # or a widened pattern on these two files — still fails here.
+    fork_release_patterns = {
+        "iot-v*",
+        "v[0-9]+.[0-9]+.[0-9]+",
+        "v[0-9]+.[0-9]+.[0-9]+.[0-9]+",
+        "v[0-9]+.[0-9]+-pi2",
+        "v[0-9]+.[0-9]+.[0-9]+-pi2",
+    }
     violations = []
     for filename, workflow in _loaded().items():
         triggers = (workflow or {}).get("on") or {}
@@ -65,6 +77,8 @@ def test_no_workflow_runs_from_a_tag_push():
         push = triggers["push"]
         # This nightly canary also gates releases with dedicated spend-capped keys.
         if filename == "live-providers.yml" and push == {"tags": ["v*"]}:
+            continue
+        if filename in {"publish-pypi.yml", "install-e2e.yml"} and set(push.get("tags", [])) <= fork_release_patterns:
             continue
         if not isinstance(push, dict) or not ({"branches", "branches-ignore"} & set(push)) or {"tags", "tags-ignore"} & set(push):
             violations.append(filename)

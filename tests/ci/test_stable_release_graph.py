@@ -5,12 +5,15 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from tests.ci.fork_workflow_paths import require_upstream_ci_yaml
+
 from tests.ci.desktop_release_roles import gate
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def workflow(name):
+    require_upstream_ci_yaml(ROOT / ".github/workflows" / name)
     return YAML(typ="base").load((ROOT / ".github/workflows" / name).read_text(encoding="utf-8"))
 
 

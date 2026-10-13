@@ -2192,6 +2192,59 @@ def _close_candidate_clients(snapshot: dict, *clients: Any) -> None:
                 logger.debug("Failed to close rejected fallback client", exc_info=True)
 
 
+def entry_context_length(entry: dict[str, Any]) -> int | None:
+    """The entry's own ``context_length`` pin, or None when it carries none.
+
+    A bool is not a length (``context_length: true`` must not read as 1), and a value that
+    cannot be read as a positive int means "no pin", not "reject the entry".
+    """
+    value = entry.get("context_length")
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        length = int(value)
+    except (TypeError, ValueError):
+        return None
+    return length if length > 0 else None
+
+
+def _candidate_context_length(agent, entry, candidate) -> int | None:
+    """Resolve a resolved-but-unbound candidate's context window (None for MoA entries).
+
+    Resolved *before* the binder moves the live runtime onto the candidate so the window can
+    be validated -- and reused by the compressor, instead of probing provider metadata twice.
+    """
+    if candidate.provider == "moa":
+        return None
+    from agent.model_metadata import get_model_context_length
+    api_key = getattr(candidate.client, "api_key", None)
+    return get_model_context_length(
+        candidate.model,
+        base_url=candidate.base_url,
+        api_key=api_key if isinstance(api_key, str) else "",
+        provider=candidate.provider,
+        config_context_length=entry_context_length(entry),
+        custom_providers=getattr(agent, "_custom_providers", None),
+    )
+
+
+def _candidate_context_floor_rejection(agent, candidate, context_length: int | None) -> str | None:
+    """Why a candidate window cannot hold the tool loop, else None.
+
+    A constrained profile may lower the default 64K floor, but a fallback that still cannot
+    hold the tool loop must never be activated.
+    """
+    if context_length is None:
+        return None
+    from agent.model_metadata import get_minimum_tool_context_length, validate_tool_context_length
+    try:
+        validate_tool_context_length(
+            candidate.model, context_length, get_minimum_tool_context_length(agent))
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
 def try_activate_fallback(agent, reason: FailoverReason | None = None, reset_at=None) -> bool:
     """Switch to the next fallback model/provider in the chain; False when exhausted. Swaps client,
     model slug and provider in place so the retry loop continues on the new backend; client
@@ -2219,13 +2272,24 @@ def try_activate_fallback(agent, reason: FailoverReason | None = None, reset_at=
         runtime_snapshot = _snapshot_fallback_runtime(agent)
         fb_client = None
         try:
-            from agent.route_binding import bind_route_entry
-            bound = bind_route_entry(agent, fb, fb_provider, fb_model)
-            if bound is None:
+            from agent.route_binding import bind_resolved_route, resolve_route_candidate
+            candidate = resolve_route_candidate(agent, fb, fb_provider, fb_model)
+            if candidate is None:
                 logger.warning("Fallback to %s failed: provider not configured", fb_provider)
                 unavailable.add(fb_key)
                 continue
-            old_model, old_provider = bound
+            # A candidate that cannot hold the tool loop must never be activated: close the
+            # client it resolved and put the runtime back before the next candidate, so a
+            # rejected entry leaves nothing of itself on the agent.
+            context_length = _candidate_context_length(agent, fb, candidate)
+            rejection = _candidate_context_floor_rejection(agent, candidate, context_length)
+            if rejection is not None:
+                logger.warning("Fallback skip: %s", rejection)
+                _restore_fallback_runtime(agent, runtime_snapshot)
+                _close_candidate_clients(runtime_snapshot, candidate.client)
+                continue
+            fb_client = candidate.client
+            old_model, old_provider = bind_resolved_route(agent, fb, candidate, context_length)
             fb_model = agent.model  # normalized by the binder
             rewrite_prompt_model_identity(agent, fb_model, fb_provider)
 

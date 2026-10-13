@@ -3,10 +3,15 @@
 import sys
 
 __release_date__ = "2026.9.24"
-# Fork: ships a real literal (the fork's packaging tests assert it equals the pyproject version and
-# the old-updater surface audit imports it). Upstream now serves this lazily from the install stamp;
-# __getattr__ below is kept for that compat path and simply is not consulted while this exists.
-__version__ = "0.21.7.post1"
+# The annotation (not a literal) is what the frozen old-updater surface audit resolves:
+# `tests/test_old_updater_compat_surface.py` reads the AST, so the name must be declared even
+# though the value is served lazily by __getattr__ below.
+__version__: str
+# Fork: keep a real literal as the fallback. The fork's packaging checks assert the shipped
+# version equals pyproject's, and Pi2 devices install the wheel with plain pip -- no install
+# stamp is written, so upstream's "0.0.0" placeholder would regress `hermes --version` there.
+# The stamp still wins whenever this tree has one (upstream's old-updater contract).
+_FALLBACK_VERSION = "0.21.7.post1"
 
 
 def __getattr__(name: str) -> str:
@@ -14,8 +19,8 @@ def __getattr__(name: str) -> str:
 
     tests/compat/old_updater_surface.json freezes that import. In-tree code resolves
     identity through hermes_cli.version_info.get_version_info(); this reads only the
-    install stamp -- never git -- and keeps the pre-stamp placeholder when a checkout
-    has no stamp.
+    install stamp -- never git. The stamp wins when one exists; without one the fork
+    answers with its literal package version (upstream returns the "0.0.0" placeholder).
 
     Lazy because ``pm`` is not importable when this package loads: a venv
     editable-installed from a pre-PM tree maps only the top-level packages it knew
@@ -35,10 +40,10 @@ def __getattr__(name: str) -> str:
         from pathlib import Path
         try:
             stamp = json.loads((Path(__file__).resolve().parents[1] / "install-stamp.json").read_text(encoding="utf-8-sig"))
-            return str(stamp.get("baseVersion") or "0.0.0")
+            return str(stamp.get("baseVersion") or _FALLBACK_VERSION)
         except (OSError, ValueError, AttributeError):
-            return "0.0.0"
-    return str(read_install_stamp(repo_root()).get("baseVersion") or "0.0.0")
+            return _FALLBACK_VERSION
+    return str(read_install_stamp(repo_root()).get("baseVersion") or _FALLBACK_VERSION)
 
 
 def _ensure_utf8() -> bool:

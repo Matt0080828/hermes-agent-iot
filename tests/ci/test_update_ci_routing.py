@@ -35,6 +35,7 @@ import pytest
 from hermes_platform.host.facts import native_arch
 from tests.ci import _gha_expr as gha
 from tests.ci import workflow_steps
+from tests.ci.fork_workflow_paths import require_upstream_ci_yaml
 
 _REPO = Path(__file__).resolve().parents[2]
 _CLASSIFIER = _REPO / "scripts" / "ci" / "classify_changes.py"
@@ -87,6 +88,7 @@ def _real_classifier(paths: list[str]) -> dict[str, bool]:
 
 @cache
 def _yaml(rel: str) -> dict:
+    require_upstream_ci_yaml(_REPO / rel)
     yaml = pytest.importorskip("hermes_yaml")
     return yaml.safe_load((_REPO / rel).read_text(encoding="utf-8-sig"))
 
