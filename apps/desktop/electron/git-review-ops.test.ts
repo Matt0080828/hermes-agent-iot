@@ -4,7 +4,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import simpleGit from 'simple-git'
+// The fork pins simple-git 4.0.2 (OSV remediation) where upstream pins 3.36.0.
+// v4 dropped the callable default export, so the escape hatch has to be reached
+// through the named factory — the same shape production uses in
+// `git-review-ops.ts` (`import { simpleGit } from 'simple-git'`).
+import { simpleGit } from 'simple-git'
 import { afterEach, test, vi } from 'vitest'
 
 import {
@@ -109,6 +113,28 @@ test('gitFor suppresses only the known custom-binary warning and restores consol
     warnings.push(args)
   }
 
+  const isKnownCustomBinaryWarning = (args: unknown[]) =>
+    typeof args[0] === 'string' && (args[0] as string).startsWith(SIMPLE_GIT_UNSAFE_BINARY_WARN)
+
+  // What the installed factory emits for this path, recorded once before gitFor
+  // runs: simple-git 3.x emits the known custom-binary warning (upstream's pin),
+  // while the fork's OSV pin 4.0.2 emits none. Asserting on the live emission keeps
+  // the filter honest — a reworded message still fails this test, not production —
+  // without hard-coding either release's behaviour.
+  const emitted: unknown[][] = []
+  console.warn = (...args: unknown[]) => {
+    emitted.push(args)
+  }
+  try {
+    simpleGit({ baseDir: process.cwd(), binary: spacedBin, unsafe: { allowUnsafeCustomBinary: true } })
+  } finally {
+    console.warn = recordingWarn
+  }
+  assert.ok(
+    emitted.every(isKnownCustomBinaryWarning),
+    `unexpected emissions: ${JSON.stringify(emitted)}`
+  )
+
   console.warn = recordingWarn
 
   try {
@@ -118,16 +144,16 @@ test('gitFor suppresses only the known custom-binary warning and restores consol
 
     assert.equal(console.warn, recordingWarn)
 
-    // The escape hatch used directly still warns: the message gitFor filters is a
-    // live emission of the installed simple-git, so the filter cannot go stale
-    // silently (an upgrade that rewords it fails this test, not production).
-    simpleGit({ baseDir: process.cwd(), binary: spacedBin, unsafe: { allowUnsafeCustomBinary: true } })
+    // Every gitFor call site produced only known emissions, so the filter swallowed
+    // all of them and the recorder saw nothing (0 when the factory emits none).
+    assert.deepEqual(warnings, [])
+
     console.warn('unrelated warning')
   } finally {
     console.warn = originalWarn
   }
 
-  assert.deepEqual(warnings, [[SIMPLE_GIT_UNSAFE_BINARY_WARN], ['unrelated warning']])
+  assert.deepEqual(warnings, [['unrelated warning']])
 })
 
 test('resolveRenamePath: simple rename resolves to the new path', () => {
