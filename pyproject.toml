@@ -600,7 +600,16 @@ hermes-iot = "hermes_cli.iot_cli:main"
 # build with --all-extras and pass --no-extra for each of these, so their
 # closures never ship. KittenTTS pulls torch, transformers and spaCy through
 # misaki[en]: installed when the user picks it, not preinstalled.
-opt-in-extras = ["kittentts"]
+#
+# modal: [tool.uv] conflicts declares modal and vercel mutually exclusive here
+# (the ARMv7 Modal path pins cbor2 5.9.0, vercel 0.7.2 needs cbor2>=6), so
+# `uv sync --all-extras` refuses the entire resolution. Upstream carries no such
+# conflict, and its bundle payload builds with --all-extras
+# (scripts/bundles/native.py), which made every bundle leg fail with
+# "Extras 'modal' and 'vercel' are incompatible with the declared conflicts".
+# Both extras stay installable on demand; the bundle just stops forcing them
+# into one resolution.
+opt-in-extras = ["kittentts", "modal"]
 
 # Per-extra platform gates (settled 2026-09-02): an extra listed here is
 # only installable on platforms matching the marker. pm consults this
