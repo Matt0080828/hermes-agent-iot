@@ -42,7 +42,8 @@ def _isolate_update(isolated_update_runtime, monkeypatch):
 
 
 def _make_run_side_effect(
-    branch="main", verify_ok=True, commit_count="1", dirty=False
+    branch="main", verify_ok=True, commit_count="1", dirty=False,
+    target_sha="a" * 40,
 ):
     """Minimal subprocess.run side_effect for the update flow."""
 
@@ -52,8 +53,14 @@ def _make_run_side_effect(
         if "rev-parse" in joined and "--abbrev-ref" in joined:
             return subprocess.CompletedProcess(cmd, 0, stdout=f"{branch}\n", stderr="")
         if "rev-parse" in joined and "--verify" in joined:
+            # v0.21.7 resolves the target commit before the tree moves: the pull
+            # marker must name the commit git writes, so an empty answer (exit 0
+            # but no object id) refuses the update and exits 1. Hand back a real
+            # object id whenever the ref is meant to resolve.
             return subprocess.CompletedProcess(
-                cmd, 0 if verify_ok else 128, stdout="", stderr=""
+                cmd, 0 if verify_ok else 128,
+                stdout=f"{target_sha}\n" if verify_ok else "",
+                stderr="",
             )
         if "rev-list" in joined:
             return subprocess.CompletedProcess(
