@@ -123,7 +123,8 @@ def test_named_pipe_identify_status_and_fleet_consumer(live_server, monkeypatch)
     _proc, home, server_pid = live_server
     from gateway.control_socket import identify_gateway, query_gateway_control
 
-    ident = identify_gateway(home, timeout=5.0)
+    # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+    ident = identify_gateway(home, timeout=20.0)
     assert ident is not None, "identify returned None against a live pipe server"
     # Compare against the server's SELF-reported pid, not Popen.pid — uv's
     # Windows trampoline makes the spawner's view wrong (see _CHILD_CODE).
@@ -132,7 +133,7 @@ def test_named_pipe_identify_status_and_fleet_consumer(live_server, monkeypatch)
     assert ident["kind"] == "hermes-gateway"
     assert ident["supervisor"] in {"systemd", "launchd", "desktop", "external", "manual"}
 
-    status = query_gateway_control(home, "status", timeout=5.0)
+    status = query_gateway_control(home, "status", timeout=20.0)
     assert status is not None
     assert status["answering_pid"] == server_pid
 
@@ -158,7 +159,7 @@ def test_pipe_gone_after_kill_falls_back(live_server, monkeypatch):
     proc, home, _server_pid = live_server
     from gateway.control_socket import identify_gateway
 
-    assert identify_gateway(home, timeout=5.0) is not None
+    assert identify_gateway(home, timeout=20.0) is not None
     _kill_tree(proc)
 
     # taskkill /T returns once the tree is signalled; the pipe disappears when

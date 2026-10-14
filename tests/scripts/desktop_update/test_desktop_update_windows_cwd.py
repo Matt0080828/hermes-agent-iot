@@ -46,7 +46,8 @@ def _run_cwd_self_test(
         errors="replace",
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        timeout=60,
+        # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+        timeout=240,
         check=False,
     )
 
@@ -87,7 +88,7 @@ def test_handoff_children_cannot_read_the_handoff_console(tmp_path: Path) -> Non
         [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
         env=env,
         creationflags=subprocess.CREATE_NEW_CONSOLE,
-        timeout=60,
+        timeout=240,
         check=False,
     )
 

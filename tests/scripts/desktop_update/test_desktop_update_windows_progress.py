@@ -74,7 +74,8 @@ def test_progress_advances_while_the_orchestrator_blocks(tmp_path: Path) -> None
     # stability window + retry sleeps), so: 30s, and every sampling deadline
     # below is derived from the moment the held stage lands, keeping the
     # whole window comfortably inside the hold.
-    env["HERMES_SELFTEST_HOLD_SECONDS"] = "30"
+    # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+    env["HERMES_SELFTEST_HOLD_SECONDS"] = "60"
 
     with output_path.open("wb") as output:
         process = subprocess.Popen(
@@ -94,7 +95,7 @@ def test_progress_advances_while_the_orchestrator_blocks(tmp_path: Path) -> None
         )
 
     try:
-        deadline = time.monotonic() + 120
+        deadline = time.monotonic() + 240
         shim_url = None
         while time.monotonic() < deadline:
             text = output_path.read_text(encoding="utf-8", errors="replace")

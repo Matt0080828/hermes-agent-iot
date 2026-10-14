@@ -65,7 +65,8 @@ def _run_helper(script: str, home: Path, env_extra: dict[str, str], out: Path) -
     """
     result = subprocess.run(['powershell', '-NoProfile', '-Command', f"$out = '{out}'; " + script],
                             env={**os.environ, 'HERMES_HOME': str(home), **env_extra},
-                            capture_output=True, timeout=120, check=False)
+                            # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+                            capture_output=True, timeout=360, check=False)
     assert result.returncode == 0, (result.stdout + result.stderr).decode('utf-8', 'replace')
     return out.read_text(encoding='utf-8-sig').splitlines()
 

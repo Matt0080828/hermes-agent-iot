@@ -72,7 +72,8 @@ def test_a7_concurrent_claimants_over_a_dead_marker_yield_one_owner(tmp_path: Pa
     try:
         time.sleep(6)
         lock.release()
-        deadline = time.monotonic() + 120
+        # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+        deadline = time.monotonic() + 360
         while not Path(str(hold) + '.pid').exists():
             assert time.monotonic() < deadline, 'no claimant reached the update'
             time.sleep(0.05)
@@ -88,7 +89,7 @@ def test_a7_concurrent_claimants_over_a_dead_marker_yield_one_owner(tmp_path: Pa
         for c in claimants:
             if c.poll() is None:
                 try:
-                    c.wait(timeout=120)
+                    c.wait(timeout=360)
                 except subprocess.TimeoutExpired:
                     subprocess.run(['taskkill', '/T', '/F', '/PID', str(c.pid)], capture_output=True, check=False)
     assert running[0].returncode == 0
@@ -127,19 +128,19 @@ def test_script_killed_before_publishing_the_delegate_runs_no_update(tmp_path: P
     script = _script(home, install=install, HANDOFF_HOLD=str(hold))
     lock = None
     try:
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 240
         while not (marker.exists() and _custodian(home, script.pid)
                    and marker.read_bytes().split(b'\n')[0] == _custodian(home, script.pid).encode()):
             assert time.monotonic() < deadline and script.poll() is None, 'script never claimed'
             time.sleep(0.02)
         lock = _HeldLock(home)   # after the claim, before the delegate publication
         child = subprocess.run([POWERSHELL, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(finder),
-                                '-Parent', str(script.pid), '-Seconds', '60'],
-                               capture_output=True, text=True, timeout=90, check=False)
+                                '-Parent', str(script.pid), '-Seconds', '240'],
+                               capture_output=True, text=True, timeout=300, check=False)
         assert child.returncode == 0, 'the update child never appeared'
         child_pid = int(child.stdout)
         subprocess.run(['taskkill', '/F', '/PID', str(script.pid)], capture_output=True, check=True)
-        script.wait(timeout=30)
+        script.wait(timeout=120)
         time.sleep(3)
         assert not ran.exists(), 'the update child ran before it was published as the delegate'
         assert not _alive(child_pid), 'the never-resumed update child outlived its script'
@@ -153,7 +154,7 @@ def test_script_killed_before_publishing_the_delegate_runs_no_update(tmp_path: P
         if script.poll() is None:
             subprocess.run(['taskkill', '/T', '/F', '/PID', str(script.pid)], capture_output=True, check=False)
             script.wait()
-    deadline = time.monotonic() + 60   # the custodian releases the marker once the lock is free
+    deadline = time.monotonic() + 240   # the custodian releases the marker once the lock is free
     while (verdict := _op(home, '-MarkerOp', 'reclaim')[1]).startswith('live '):
         assert time.monotonic() < deadline
         time.sleep(0.2)
