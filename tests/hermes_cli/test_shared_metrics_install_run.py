@@ -180,6 +180,13 @@ def test_receipt_is_recorded_only_on_a_day_the_sender_can_ever_send(marks, monke
     t0 = datetime(2026, 10, 6, tzinfo=UTC)
     clock = {"now": t0 + timedelta(hours=9)}
     monkeypatch.setattr(store_module, "_utc_now", lambda: clock["now"])
+    # install_run._stale() reads the real clock (`time.time()`) while the receipt's
+    # finished_at is pinned to this fake day, so the test silently expired once the
+    # wall clock passed finished_at + MAX_RECEIPT_AGE_SECONDS (7 days) and the receipt
+    # was pruned before the assertions ran. Freeze the module's clock on the same fake
+    # day: this test is about consent gating, not about today's date.
+    monkeypatch.setattr(install_run, "time",
+                        SimpleNamespace(time=lambda: clock["now"].timestamp()))
     monkeypatch.setattr("hermes_cli.config.read_raw_config_readonly",
                         lambda: {"telemetry": {"shared_metrics": {"enabled": True, "send": True}}})
     store = store_module.SharedMetricsStore()
