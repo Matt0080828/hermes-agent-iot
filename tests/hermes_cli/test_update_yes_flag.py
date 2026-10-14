@@ -26,6 +26,20 @@ def _official_update_default():
 
 
 @pytest.fixture(autouse=True)
+def _in_process_completion(isolated_source_completion):
+    """Keep the update tail in-process, like the sibling updater suites do.
+
+    v0.21.7 splits `hermes update` into a prepare step and a detached completion
+    child (``update_completion`` spawns it with ``subprocess.Popen``). These
+    tests patch ``subprocess.run``, so the child is a *real* process: it exits on
+    its own and the parent returns before the interactive prompts this file
+    covers. ``isolated_source_completion`` (conftest) replaces that hand-off with
+    an in-process ``run_completion``, which is what these assertions need.
+    """
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _isolate_update(isolated_update_runtime, monkeypatch):
     import shutil
     from hermes_cli import managed_uv, update_cmd, update_cmd_fleet
@@ -83,7 +97,7 @@ def _make_run_side_effect(
 class TestUpdateYesConfigMigration:
     """--yes auto-answers the config-migration prompt and skips API-key prompts."""
 
-    @patch("hermes_cli.update_cmd._run_migrate_config_fresh")
+    @patch("hermes_cli.config.migrate_config")
     @patch("hermes_cli.update_cmd._run_config_check_fresh", return_value=(1, 2))
     @patch("hermes_cli.config.get_missing_config_fields", return_value=[])
     @patch("hermes_cli.config.get_missing_env_vars", return_value=["NEW_KEY"])
@@ -117,7 +131,7 @@ class TestUpdateYesConfigMigration:
         _, kwargs = mock_migrate.call_args
         assert kwargs.get("interactive") is False
 
-    @patch("hermes_cli.update_cmd._run_migrate_config_fresh")
+    @patch("hermes_cli.config.migrate_config")
     @patch("hermes_cli.update_cmd._run_config_check_fresh", return_value=(1, 2))
     @patch("hermes_cli.config.get_missing_config_fields", return_value=[])
     @patch("hermes_cli.config.get_missing_env_vars", return_value=["NEW_KEY"])
@@ -170,7 +184,7 @@ class TestUnicodeDecodeErrorInUpdatePrompts:
     the exception escape and crash `hermes update` mid-flight.
     """
 
-    @patch("hermes_cli.update_cmd._run_migrate_config_fresh")
+    @patch("hermes_cli.config.migrate_config")
     @patch("hermes_cli.update_cmd._run_config_check_fresh", return_value=(1, 2))
     @patch("hermes_cli.config.get_missing_config_fields", return_value=[])
     @patch("hermes_cli.config.get_missing_env_vars", return_value=["NEW_KEY"])
