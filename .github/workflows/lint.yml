@@ -175,15 +175,22 @@ jobs:
     # already over target, else the target) and pattern rules compare fingerprints, so a PR
     # cannot trade one violation for another. The merge commit is compared with its first
     # parent (current main), so an improvement that lands on main is locked in at once.
+    #
+    # Sync PRs are the exception, and the base step below picks their base: a sync merges an
+    # upstream release into the fork, so the first parent (the previous, older upstream) holds
+    # caps from code upstream has since grown past — thousands of findings that are not this
+    # fork's to fix. See the step's comment.
     name: code health ratchet (blocking)
     if: inputs.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
         with:
-          fetch-depth: 2 # the merge commit and its first parent (the base branch tip)
+          # 50, not 2 (the merge commit and its first parent): a sync PR's own merge sits a few
+          # commits below the PR head, and the base step needs that merge's second parent.
+          fetch-depth: 50
 
       - uses: ./.github/actions/setup-pm
         with:
@@ -195,8 +202,27 @@ jobs:
         with:
           command: python -m scripts.ci.python_packages "$(python -m scripts.code_health --print-pins)"
 
-      - name: Ratchet the PR against the base branch tip
-        run: python scripts/check --only health --base HEAD^1
+      - name: Pick the ratchet base
+        id: base
+        # A sync PR merges an upstream release into the fork. Measured against the base branch tip
+        # (the previous, older upstream), every unit upstream grew in between keeps a cap from the
+        # older code and the lane reports thousands of pre-existing findings it can never clear.
+        # When the PR head is a sync merge, compare against the commit it merges instead: fork-owned
+        # units do not exist in that base, so they are still measured against the target, while
+        # upstream's own units are measured against upstream's own baseline. Anything unexpected —
+        # no such merge, unresolvable second parent, a plain PR — keeps HEAD^1.
+        run: |
+          set -u
+          base=HEAD^1
+          sync=$(git rev-list --merges --first-parent HEAD^2 --not HEAD^1 2>/dev/null | tail -1 || true)
+          if [ -n "$sync" ] && git cat-file -e "$sync^2^{commit}" 2>/dev/null; then
+            base=$(git rev-parse "$sync^2^{commit}")
+          fi
+          echo "ratchet base: $(git log -1 --format='%h %ad %s' --date=short "$base")"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
+      - name: Ratchet the PR against the selected base
+        run: python scripts/check --only health --base "${{ steps.base.outputs.base }}"
 
       - name: Check the checkout is clean
         # Last step of every job (tests/ci/test_clean_worktree_check.py): a test or CI step that
