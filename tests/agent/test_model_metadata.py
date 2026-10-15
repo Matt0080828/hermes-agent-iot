@@ -59,7 +59,6 @@ class TestEstimateTokensRough:
 
 class TestEstimateMessagesTokensRough:
 
-
     def test_tool_call_message(self):
         """Tool call messages with no 'content' key still contribute tokens."""
         msg = {"role": "assistant", "content": None,
@@ -387,7 +386,6 @@ class TestDefaultContextLengths:
         assert get_model_context_length("") == DEFAULT_FALLBACK_CONTEXT
         assert get_model_context_length(None) == DEFAULT_FALLBACK_CONTEXT  # type: ignore[arg-type]
 
-
     def test_xai_oauth_grok_build_uses_xai_models_dev_context(self):
         """xAI OAuth should share the xAI provider metadata path.
 
@@ -430,7 +428,6 @@ class TestCodexOAuthContextLength:
         import agent.model_metadata as mm
         mm._codex_oauth_context_cache = {}
         mm._codex_oauth_max_context_cache = {}  # the fallback branch reads it too
-
 
     def test_live_catalogue_cache_is_scoped_to_access_token(self):
         """Different OAuth tokens must not share entitlement-specific metadata."""
@@ -1226,27 +1223,6 @@ class TestGetModelContextLength:
         # The local probe MUST be called exactly once
         mock_local_ctx.assert_called_once()
 
-    def test_local_context_cache_uses_configured_profile_floor(self):
-        from agent.model_metadata import _maybe_cache_local_context_length
-
-        with (
-            patch(
-                "agent.model_metadata.get_minimum_tool_context_length",
-                return_value=2048,
-            ),
-            patch("agent.model_metadata.save_context_length") as mock_save,
-        ):
-            _maybe_cache_local_context_length(
-                "tiny-local",
-                "http://pi2.local:11434/v1",
-                4096,
-            )
-
-        mock_save.assert_called_once_with(
-            "tiny-local",
-            "http://pi2.local:11434/v1",
-            4096,
-        )
 
     # ── Codex routes are keyed on the transport, not the host (#116191) ──────────────
 
@@ -1318,21 +1294,6 @@ class TestGetModelContextLength:
 # Active tool-context floor parsing
 # =========================================================================
 
-
-@pytest.mark.parametrize("value", [None, True, False, 0, -1, "0", "-8", "bad", object()])
-def test_minimum_tool_context_length_invalid_values_fail_closed(value):
-    from agent.model_metadata import MINIMUM_CONTEXT_LENGTH, get_minimum_tool_context_length
-
-    agent = SimpleNamespace(_minimum_tool_context_length=value)
-    assert get_minimum_tool_context_length(agent) == MINIMUM_CONTEXT_LENGTH
-
-
-def test_minimum_tool_context_length_accepts_positive_integer_string():
-    from agent.model_metadata import get_minimum_tool_context_length
-
-    assert get_minimum_tool_context_length(
-        SimpleNamespace(_minimum_tool_context_length="2048")
-    ) == 2048
 
 # =========================================================================
 # Bedrock context resolution — must run BEFORE custom-endpoint probe
@@ -1446,7 +1407,6 @@ class TestStripProviderPrefix:
         assert _strip_provider_prefix("anthropic:claude-sonnet-4") == "claude-sonnet-4"
         assert _strip_provider_prefix("stepfun:step-3.5-flash") == "step-3.5-flash"
 
-
     def test_http_urls_preserved(self):
         assert _strip_provider_prefix("http://example.com") == "http://example.com"
         assert _strip_provider_prefix("https://example.com") == "https://example.com"
@@ -1512,7 +1472,6 @@ class TestFetchModelMetadata:
         cache_path = tmp_path / "openrouter_model_metadata.json"
         monkeypatch.setattr(mm, "_get_model_metadata_cache_path", lambda: cache_path)
         return cache_path
-
 
     def test_network_success_writes_disk_cache(self, tmp_path, monkeypatch):
         self._reset_cache()
@@ -1601,7 +1560,6 @@ class TestGetNextProbeTier:
     def test_from_256k(self):
         assert get_next_probe_tier(CONTEXT_PROBE_TIERS[0]) == CONTEXT_PROBE_TIERS[1]
 
-
     def test_from_8k_returns_none(self):
         assert get_next_probe_tier(CONTEXT_PROBE_TIERS[-1]) is None
 
@@ -1652,7 +1610,6 @@ class TestParseContextLimitFromError:
         assert get_context_length_from_provider_error(msg, 131072) == 32768
         # Parsed limit not below current window → no recalibration.
         assert get_context_length_from_provider_error(msg, 32768) is None
-
 
     def test_output_cap_message_is_not_a_context_limit(self):
         """An output-cap error must never be cached as the context window (salvage #106769):

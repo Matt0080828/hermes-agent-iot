@@ -122,7 +122,7 @@ def _atomic_private_create(path: Path, content: str) -> tuple[int, int] | None:
 
 
 def _home() -> Path:
-    return Path(os.environ.get("HERMES_HOME", "").strip() or Path.home() / ".hermes")
+    return Path(os.environ.get("HERMES_HOME", "").strip() or Path.home() / ".hermes")  # health: allow HX001 -- the IoT installer resolves the home the shell install uses (HERMES_HOME, else ~/.hermes) before any context-local override exists
 
 
 def _ensure_private_env(home: Path) -> None:

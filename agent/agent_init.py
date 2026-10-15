@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the fork's IoT delta grows this upstream file past its cap; moving upstream code out would conflict on every upstream sync
 """Implementation of :meth:`AIAgent.__init__` as ``init_agent(agent, ...)``.
 
 ``init_agent`` is a thin, ordered orchestrator over ``_init_*`` / ``_build_*`` phase

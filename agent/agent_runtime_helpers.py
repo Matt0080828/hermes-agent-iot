@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the fork's IoT delta grows this upstream file past its cap; moving upstream code out would conflict on every upstream sync
 """Assorted AIAgent runtime helpers (message repair/sanitization, credential recovery, primary
 runtime restore, prompt-cache policy, client construction, model switching, tool invocation).
 Each function takes the parent ``AIAgent`` as ``agent`` except the stateless message helpers.

@@ -9,12 +9,15 @@ Usage:
     .venv/bin/python scripts/discord-voice-doctor.py
 """
 
+import logging
 import os
 import sys
 import shutil
 from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
+
+logger = logging.getLogger(__name__)
 
 # Resolve project root
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -100,6 +103,9 @@ def check_packages():
                 nacl.secret.Aead(bytes(32))
                 check("PyNaCl", True, f"v{ver}")
             except Exception:
+                # Any failure here means the encryption backend is unusable; keep the
+                # traceback so the report is actionable instead of a bare red cross.
+                logger.debug("PyNaCl Aead self-test failed", exc_info=True)
                 check("PyNaCl (Aead)", False, f"v{ver} — encryption unavailable")
                 ok = False
     except ImportError:

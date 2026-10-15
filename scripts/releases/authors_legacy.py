@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- a pure data module (frozen legacy author-alias map): there is no function or class to move out, and the fork's delta is one case-variant alias that cannot get its own case-colliding path
 """Frozen legacy commit-email → GitHub login mappings. Data only; never append.
 
 The contributor-check CI job and ``scripts/audit_pr_attribution.py`` grep this

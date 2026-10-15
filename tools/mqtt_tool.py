@@ -22,6 +22,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone, UTC
 import json
+import logging
 import math
 import os
 import secrets
@@ -30,6 +31,8 @@ import time
 from typing import Any, Callable
 
 from tools.registry import registry, tool_error
+
+logger = logging.getLogger(__name__)
 
 
 _MAX_TOPIC_BYTES = 65535
@@ -49,7 +52,8 @@ def _mqtt_client_factory():
     except Exception:
         # If lazy install is unavailable/disabled, fall through to the import so
         # the handler reports the concrete ModuleNotFoundError to the caller.
-        pass
+        logger.debug("MQTT lazy install unavailable; falling back to a plain import",
+                     exc_info=True)
 
     import paho.mqtt.client as mqtt  # type: ignore[unresolved-import]
 
@@ -203,11 +207,11 @@ def _safe_close_client(client: Any) -> None:
     try:
         client.loop_stop()
     except Exception:
-        pass
+        logger.debug("MQTT loop_stop failed during best-effort cleanup", exc_info=True)
     try:
         client.disconnect()
     except Exception:
-        pass
+        logger.debug("MQTT disconnect failed during best-effort cleanup", exc_info=True)
 
 
 def _inbound_payload_size(msg: Any) -> int:
@@ -468,6 +472,7 @@ def _handle_mqtt_publish(args: dict, **kw) -> str:
         )
         return json.dumps({"result": _publish(topic, payload, qos=qos, retain=retain)})
     except Exception as exc:
+        logger.debug("_handle_mqtt_publish failed", exc_info=True)
         return tool_error(str(exc))
 
 
@@ -480,6 +485,7 @@ def _handle_mqtt_subscribe_recent(args: dict, **kw) -> str:
         result = _subscribe_recent(topic_filter, timeout_seconds=timeout_seconds, max_messages=max_messages, qos=qos)
         return json.dumps({"result": result})
     except Exception as exc:
+        logger.debug("_handle_mqtt_subscribe_recent failed", exc_info=True)
         return tool_error(str(exc))
 
 
@@ -509,6 +515,7 @@ def _handle_mqtt_device_command(args: dict, **kw) -> str:
         publish_result = _publish(command_topic, payload, qos=qos, retain=retain)
         return json.dumps({"result": {**publish_result, "command_topic": command_topic, "state_messages": []}})
     except Exception as exc:
+        logger.debug("_handle_mqtt_device_command failed", exc_info=True)
         return tool_error(str(exc))
 
 

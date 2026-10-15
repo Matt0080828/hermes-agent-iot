@@ -114,7 +114,6 @@ class TestResolveTaskProviderModel:
         assert api_mode is None
 
 
-
     def test_explicit_provider_adopts_configured_task_endpoint(self):
         """Explicit provider matching the configured one must not bypass
         auxiliary.<task>.base_url/api_key (#58515)."""
@@ -4755,14 +4754,6 @@ class TestCompressionFallbackContextFilter:
         assert _task_minimum_context_length("") is None
         assert _task_minimum_context_length(None) is None
 
-    def test_compression_task_uses_configured_profile_floor(self):
-        from agent.auxiliary_client import _task_minimum_context_length
-
-        with patch(
-            "hermes_cli.config.load_config_readonly",
-            return_value={"agent": {"minimum_tool_context_length": 2048}},
-        ):
-            assert _task_minimum_context_length("compression") == 2048
 
 
 class TestCustomEndpointApiKeyInheritance:

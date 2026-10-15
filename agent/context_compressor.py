@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the fork's IoT delta grows this upstream file past its cap; moving upstream code out would conflict on every upstream sync
 """Automatic context window compression: a cheap auxiliary model summarizes middle turns while head and
 tail are protected (iterative summaries, token-budget tail, tool-output pruning first, scaled budgets)."""
 

@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the fork's IoT delta grows this upstream file past its cap; moving upstream code out would conflict on every upstream sync
 """API-call helpers extracted from :class:`AIAgent`: non-streaming and streaming
 request drivers, request kwargs builder, assistant-message materializer,
 provider-fallback activator, max-iterations handler, per-turn resource cleanup.

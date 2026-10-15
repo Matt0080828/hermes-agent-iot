@@ -93,15 +93,24 @@ def environment() -> dict:
     return env
 
 
+# A child import that never answers must not hang the whole benchmark.
+IMPORT_TIMEOUT_SECONDS = 300.0
+
+
 def import_cost(module: str) -> dict:
     """Import `module` in a fresh interpreter and report its own cost."""
     code = CHILD_REPORT.replace("{mod}", module)
     t0 = time.perf_counter()
-    proc = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            check=False,
+            timeout=IMPORT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return {"module": module,
+                "error": f"child import exceeded {IMPORT_TIMEOUT_SECONDS:.0f}s"}
     wall = time.perf_counter() - t0
     if proc.returncode != 0:
         return {"module": module, "error": (proc.stderr or "").strip().splitlines()[-1:] or ["failed"]}

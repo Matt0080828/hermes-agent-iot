@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the fork's IoT delta grows this upstream file past its cap; moving upstream code out would conflict on every upstream sync
 """Model metadata, context lengths, and token estimation utilities.
 
 Pure utility functions with no AIAgent dependency. Used by ContextCompressor
@@ -286,6 +287,7 @@ def get_minimum_tool_context_length(agent: Any = None) -> int:
             if isinstance(agent_config, dict):
                 value = agent_config.get("minimum_tool_context_length")
         except Exception:
+            logger.debug("agent config unavailable; using the default context floor", exc_info=True)
             value = None
     if value is None or isinstance(value, bool):
         return MINIMUM_CONTEXT_LENGTH

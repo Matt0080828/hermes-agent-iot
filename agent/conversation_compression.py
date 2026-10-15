@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the fork's IoT delta grows this upstream file past its cap; moving upstream code out would conflict on every upstream sync
 """Context compression: feasibility probe, warning replay, compress, image fix.
 
 Thread-safety contract for extension points: with ``compression.context_timeout_seconds > 0`` (default) the

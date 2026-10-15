@@ -63,7 +63,6 @@ _startup_fast.normalize_hermes_home_env()
 def _argv_is_gateway_run(argv: list) -> bool:
     return any(a == "gateway" and b == "run" for a, b in itertools.pairwise(argv))
 
-
 if _argv_is_gateway_run(sys.argv[1:]):
     try:
         from hermes_startup_watchdog import arm_startup_watchdog as _arm_sw
@@ -72,7 +71,6 @@ if _argv_is_gateway_run(sys.argv[1:]):
         del _arm_sw
     except Exception:
         pass
-
 
 def _exit_after_oneshot(rc: object) -> None:
     """Exit one-shot mode without letting late native finalizers change rc.
@@ -96,7 +94,6 @@ def _exit_after_oneshot(rc: object) -> None:
         pass
     os._exit(rc if isinstance(rc, int) else (0 if rc is None else 1))
 
-
 _oneshot_cleanup_done = False
 # (module, attr, kwargs, exceptions swallowed). MCP shutdown may raise
 # BaseException-derived errors from executor teardown; the rest are Exception.
@@ -111,7 +108,6 @@ _ONESHOT_CLEANUPS = (
     # The atexit hook that closes the metrics session never runs past os._exit.
     ("hermes_cli.observability.relay_shared_metrics", "shutdown_runtimes", {}, Exception),
 )
-
 
 def _cleanup_oneshot_runtime() -> None:
     """Best-effort process-global cleanup before one-shot hard exit.
@@ -426,31 +422,7 @@ PROJECT_ROOT = Path(_startup_fast.project_root_str())
 _startup_fast.ensure_project_root_on_path()
 
 
-def _is_iot_install() -> bool:
-    """Return whether the active source/package is the protected IoT fork.
-
-    Detection is redundant for source vs wheel, but a user-writable
-    ``install-profile.json`` alone is not trusted: that file must not redirect
-    an official hermes-agent install onto ``pi2-lite``.
-    """
-    from importlib import metadata as importlib_metadata
-
-    try:
-        importlib_metadata.distribution("hermes-agent-iot")
-        return True
-    except importlib_metadata.PackageNotFoundError:
-        pass
-    except Exception:
-        pass
-
-    try:
-        import tomllib
-
-        with (PROJECT_ROOT / "pyproject.toml").open("rb") as stream:
-            project = tomllib.load(stream).get("project", {})
-        return project.get("name") == "hermes-agent-iot"
-    except (OSError, ValueError, TypeError):
-        return False
+from hermes_cli.iot_install import _is_iot_install  # re-exported: main_install_repair and tests read hermes_cli.main._is_iot_install
 
 
 # Profile override — MUST happen before any hermes module import: many modules
@@ -2507,7 +2479,6 @@ def cmd_update(args):
     finally:
         _update_lock.release()
         _finalize_update_output(_update_io_state)
-
 
 
 def _coalesce_session_name_args(argv: list) -> list:
