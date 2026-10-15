@@ -67,7 +67,11 @@ jobs:
   detect:
     name: Detect affected areas
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    # fork: standard-runner budget — the classifier paginates `gh api` over the
+    # PR's file list and this PR carries ~10k files, while the checkout itself
+    # took 46 s on this runner. Measured 2026-10-15: job killed at the 1-minute
+    # cap mid-classify, every downstream lane skipped, aggregate gate red.
+    timeout-minutes: 5
     outputs:
       python: ${{ steps.gate-lanes.outputs.python }}
       python_prod: ${{ steps.gate-lanes.outputs.python_prod }}
