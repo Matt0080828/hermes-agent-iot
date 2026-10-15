@@ -135,7 +135,8 @@ def test_progress_advances_while_the_orchestrator_blocks(tmp_path: Path) -> None
         # -- which is what a stalled update looks like to the user.
         assert int(second["elapsed_seconds"]) > int(first["elapsed_seconds"])
 
-        assert process.wait(timeout=60) == 0
+        # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+        assert process.wait(timeout=240) == 0
     finally:
         if process.poll() is None:
             subprocess.run(

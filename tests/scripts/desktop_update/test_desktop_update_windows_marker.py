@@ -50,7 +50,8 @@ def _creation_time(pid: int) -> str:
         ['powershell', '-NoProfile', '-Command',
          f"$c = (Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CreationDate; "
          "[DateTimeOffset]::new($c.ToUniversalTime()).ToUnixTimeMilliseconds().ToString()"],
-        capture_output=True, text=True, timeout=60, check=True,
+        # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+        capture_output=True, text=True, timeout=240, check=True,
     ).stdout.strip()
     return f'{int(out) / 1000:.3f}'
 
@@ -65,7 +66,8 @@ def _protected_pid() -> int:
     rows = subprocess.run(
         ['powershell', '-NoProfile', '-Command',
          'Get-CimInstance Win32_Process | ForEach-Object { \'{0} {1}\' -f $_.ProcessId, $_.Name }'],
-        capture_output=True, text=True, timeout=60, check=True,
+        # fork: standard-runner budget — the hosted 4-vCPU image runs CIM far slower.
+        capture_output=True, text=True, timeout=240, check=True,
     ).stdout.splitlines()
     for row in rows:
         pid, _, name = row.strip().partition(' ')
@@ -263,7 +265,8 @@ def test_ui_profile_sweep_keeps_dirs_of_live_handoffs(tmp_path: Path, sleeper: s
         ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPT), '-SelfTestUi', '-NoUi'],
         cwd=tmp_path, env={**os.environ, 'HERMES_HOME': str(home), 'TEMP': str(tmp_path),
                            'HERMES_SELFTEST_HOLD_SECONDS': '0'},
-        capture_output=True, text=True, timeout=120,
+        # fork: standard-runner budget — the hosted image starts PowerShell trees far slower.
+        capture_output=True, text=True, timeout=360,
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
@@ -301,7 +304,8 @@ def _parent_pid(pid: int) -> int:
     out = subprocess.run(
         ['powershell', '-NoProfile', '-Command',
          f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').ParentProcessId"],
-        capture_output=True, text=True, timeout=60, check=True,
+        # fork: standard-runner budget — the hosted 4-vCPU image runs CIM far slower.
+        capture_output=True, text=True, timeout=240, check=True,
     ).stdout.strip()
     return int(out or 0)
 

@@ -66,7 +66,8 @@ def _old_desktop(home: Path, mode: str, foreign: int = 0, other_desktop: int = 0
     desktop = subprocess.Popen([sys.executable, str(program), str(home), str(SCRIPT), mode, str(foreign),
                                 str(other_desktop), str(env_skew)],
                                env={**os.environ, 'HERMES_HOME': str(home), 'POWERSHELL': POWERSHELL})
-    deadline = time.monotonic() + 30
+    # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+    deadline = time.monotonic() + 180
     while not (home / 'desktop.json').exists():
         assert time.monotonic() < deadline and desktop.poll() is None, 'old desktop never spawned'
         time.sleep(0.05)
@@ -170,7 +171,8 @@ def test_launcher_lineage_rule_matches_the_shared_table(tmp_path: Path) -> None:
     harness.write_text(_RULE_HARNESS, encoding='utf-8')
     proc = subprocess.run([POWERSHELL, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(harness),
                            '-MarkerPs1', str(MARKER_PS1), '-Marker', str(tmp_path / MARKER), '-Cases', str(cases)],
-                          capture_output=True, text=True, timeout=120, check=False)
+                          # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+                          capture_output=True, text=True, timeout=360, check=False)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     got = dict(line.split('=') for line in proc.stdout.split())
     want = {c['id']: '1' if c['expect'] else '0' for c in RULE_CASES}

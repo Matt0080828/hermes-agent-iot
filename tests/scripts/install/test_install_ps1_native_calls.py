@@ -26,8 +26,9 @@ def _powershell() -> str:
 
 def _dot_sourced(body: str) -> subprocess.CompletedProcess:
     script = f'$ErrorActionPreference = "Stop"; . "{INSTALLER}"; {body}'
+    # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
     return subprocess.run([_powershell(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-                          capture_output=True, text=True, timeout=120, check=False)
+                          capture_output=True, text=True, timeout=300, check=False)
 
 
 def test_native_stderr_under_stop_leaves_the_exit_code_to_the_caller():
@@ -56,7 +57,8 @@ def _stage(origin: Path, home: Path, *extra: str, **env_extra: str) -> tuple[sub
     env = dict(os.environ, HERMES_REPO_URL=str(origin), HERMES_HOME=str(home), **env_extra)
     result = subprocess.run([_powershell(), "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(INSTALLER),
                              "-Stage", "repository", "-Json", *extra],
-                            env=env, capture_output=True, text=True, timeout=180, check=False)
+                            # fork: standard-runner budget — upstream CI runs this lane on a 32-core Windows runner.
+                            env=env, capture_output=True, text=True, timeout=600, check=False)
     frames = [json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
     assert len(frames) == 1, result.stdout + result.stderr
     return result, frames[0]

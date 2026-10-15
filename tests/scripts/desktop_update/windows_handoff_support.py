@@ -36,7 +36,9 @@ if __name__ == '__main__':
 """
 
 
-def _ps(command: str, timeout: int = 60) -> str:
+# fork: standard-runner budget — upstream runs this lane on a 32-core Windows runner;
+# a CIM query that costs ~1 s there can take over a minute on the hosted 4-vCPU image.
+def _ps(command: str, timeout: int = 240) -> str:
     return subprocess.run([POWERSHELL, '-NoProfile', '-Command', command],
                           capture_output=True, text=True, timeout=timeout, check=True).stdout.strip()
 
@@ -69,7 +71,7 @@ def _script(home: Path, *args: str, install: Path | None = None, **env: str) -> 
         cwd=home, env=_env(home, **env), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
 
-def _finish(proc: subprocess.Popen, timeout: int = 120) -> tuple[int, str]:
+def _finish(proc: subprocess.Popen, timeout: int = 360) -> tuple[int, str]:
     try:
         out, _ = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -83,7 +85,7 @@ def _op(home: Path, *args: str) -> tuple[int, str, str]:
     proc = subprocess.run(
         [POWERSHELL, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPT),
          '-InstallRoot', str(home / 'hermes-agent'), *args],
-        cwd=home, env=_env(home), capture_output=True, text=True, timeout=120, check=False)
+        cwd=home, env=_env(home), capture_output=True, text=True, timeout=360, check=False)
     return proc.returncode, proc.stdout, proc.stderr
 
 
@@ -125,7 +127,7 @@ class _HeldLock:
         self._f.close()
 
 
-def _wait_for_log(home: Path, needle: str, timeout: int = 90) -> str:
+def _wait_for_log(home: Path, needle: str, timeout: int = 240) -> str:
     deadline = time.monotonic() + timeout
     while needle not in _log(home):
         assert time.monotonic() < deadline, f'{needle!r} never logged: {_log(home)}'

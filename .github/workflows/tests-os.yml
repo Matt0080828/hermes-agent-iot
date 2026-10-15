@@ -92,6 +92,9 @@ jobs:
           - name: Windows-only tests
             runner: windows-latest
             marker: windows
+            # fork: the hosted 4-vCPU image plus the 900 s per-file budget needs more
+            # headroom than the 30 min default.
+            timeout: 45
           - name: Windows-only tests (arm64)
             # IoT fork: no windows-latest-32-arm-core larger runner on this repo
             # (same reason the Linux lanes use public ubuntu-latest). GitHub's
@@ -195,6 +198,12 @@ jobs:
           # starves cold child startup before the fixture's idle deadline.
           HERMES_TEST_WORKERS: ${{ matrix.marker == 'windows' && (runner.arch == 'ARM64' && '16' || '16') || '' }}
           HERMES_TEST_SLICE: ${{ matrix.slice || '' }}
+          # fork: standard-runner budget — this lane was sized for a 32-core larger
+          # runner. On the hosted image a file with many CIM/PowerShell round trips
+          # (tests/scripts/desktop_update/test_desktop_update_windows_marker.py) was
+          # killed at the 300 s default before it collected, reported as "no tests
+          # ran". Same knob the Windows E2E lane below already sets.
+          HERMES_TEST_FILE_TIMEOUT: ${{ matrix.marker == 'windows' && '900' || '300' }}
           # Belt-and-suspenders with tests/conftest.py's env blanking: no
           # test may reach a real provider API.
           OPENROUTER_API_KEY: ''
